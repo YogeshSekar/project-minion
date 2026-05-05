@@ -1,0 +1,20 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Solid red background -->
+  <circle cx="128" cy="128" r="120" fill="#DC4C3F"/>
+  
+  <!-- Large white document -->
+  <rect x="64" y="48" width="128" height="160" rx="16" fill="white"/>
+  
+  <!-- Bold note lines - solid, thicker -->
+  <rect x="84" y="80" width="88" height="8" rx="4" fill="#DC4C3F" opacity="0.25"/>
+  <rect x="84" y="104" width="64" height="8" rx="4" fill="#DC4C3F" opacity="0.25"/>
+  <rect x="84" y="128" width="80" height="8" rx="4" fill="#DC4C3F" opacity="0.25"/>
+  
+  <!-- Large meeting dots -->
+  <circle cx="100" cy="176" r="14" fill="#DC4C3F"/>
+  <circle cx="156" cy="176" r="14" fill="#DC4C3F"/>
+  
+  <!-- Large checkmark badge overlapping -->
+  <circle cx="168" cy="72" r="40" fill="#DC4C3F" stroke="white" stroke-width="5"/>
+  <path d="M152 72 L160 84 L184 60" stroke="white" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

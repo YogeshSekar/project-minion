@@ -1,0 +1,42 @@
+<svg width="256" height="256" viewBox="0 0 256 256" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366F1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8B5CF6;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#10B981;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#059669;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="128" cy="128" r="120" fill="url(#bg)" />
+  
+  <!-- Minion character simplified -->
+  <!-- Head -->
+  <circle cx="128" cy="90" r="35" fill="#FFD93D" />
+  
+  <!-- Goggles -->
+  <rect x="93" y="82" width="30" height="16" rx="8" fill="#2D3748" />
+  <rect x="133" y="82" width="30" height="16" rx="8" fill="#2D3748" />
+  <circle cx="108" cy="90" r="6" fill="#63B3ED" />
+  <circle cx="148" cy="90" r="6" fill="#63B3ED" />
+  
+  <!-- Body -->
+  <rect x="98" y="120" width="60" height="50" rx="20" fill="#4A5568" />
+  
+  <!-- Overalls -->
+  <rect x="88" y="140" width="80" height="40" rx="5" fill="#2563EB" />
+  
+  <!-- Pocket with tools -->
+  <rect x="105" y="150" width="25" height="20" rx="3" fill="#1E293B" />
+  
+  <!-- Task/check icon in pocket -->
+  <path d="M110 157 L113 160 L120 153" stroke="#10B981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+  <circle cx="115" cy="160" r="2" fill="#10B981" />
+  
+  <!-- Arms holding tools -->
+  <rect x="75" y="135" width="20" height="8" rx="4" fill="#FFD93D" transform="rotate(-15 85 139)" />
+  <rect x="161" y="135" width="20" height="8" rx="4" fill="#FFD93D" transform="rotate(15 171 139)" />
+</svg>
