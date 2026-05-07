@@ -31,17 +31,11 @@ export async function getRunningActivity() {
   return await invoke('get_running_activity')
 }
 
-// Task API functions
-export async function getAllTaskViews() {
-  return await invoke('get_all_task_views')
-}
+// TODO: TaskView API functions removed during final cleanup
+// Frontend now uses Task struct directly
 
-export async function getTaskViewsByProject(projectId) {
-  return await invoke('get_task_views_by_project', { projectId })
-}
-
-export async function getTaskViewByOccurrence(occurrenceId) {
-  return await invoke('get_task_view_by_occurrence', { occurrenceId })
+export async function getAllTasks() {
+  return await invoke('get_all_tasks')
 }
 
 export async function createTask(request) {
@@ -52,37 +46,16 @@ export async function updateTask(request) {
   return await invoke('update_task', { request })
 }
 
-// TaskOccurrence API functions
-export async function createTaskOccurrence(request) {
-  return await invoke('create_task_occurrence', { request })
+export async function deleteTask(id) {
+  return await invoke('delete_task', { id })
 }
 
-export async function updateTaskOccurrence(request) {
-  return await invoke('update_task_occurrence', { request })
-}
+// TODO: TaskOccurrence API functions removed during final cleanup
+// No longer using occurrence-based architecture
 
-export async function deleteTaskOccurrence(id) {
-  return await invoke('delete_task_occurrence', { id })
-}
+// TODO: TaskReminder API functions removed during final cleanup
+// No longer using occurrence-based reminder system
 
-export async function completeTaskOccurrence(occurrenceId, actualMinutes) {
-  return await invoke('complete_task_occurrence', { occurrenceId, actualMinutes })
-}
-
-// TaskReminder API functions
-export async function createTaskReminder(request) {
-  return await invoke('create_task_reminder', { request })
-}
-
-export async function updateTaskReminder(request) {
-  return await invoke('update_task_reminder', { request })
-}
-
-export async function deleteTaskReminder(id) {
-  return await invoke('delete_task_reminder', { id })
-}
-
-// Project API functions
 export async function getAllProjects() {
   return await invoke('get_all_projects')
 }

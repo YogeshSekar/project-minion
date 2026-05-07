@@ -84,7 +84,7 @@ function ActivitiesPage() {
   }
 
   const getTaskTitle = (id) => {
-    const task = tasks.find(t => t.occurrence_id === id)
+    const task = tasks.find(t => t.id === id)
     return task ? task.title : 'Unknown Task'
   }
 
@@ -225,9 +225,9 @@ function ActivitiesPage() {
                   </div>
                   {tasks.map(task => (
                     <div
-                      key={task.occurrence_id}
-                      onClick={() => { setQuickSelectedTask(task.occurrence_id); quickTaskDropdown.setIsOpen(false) }}
-                      className={`px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 truncate ${quickSelectedTask === task.occurrence_id ? 'bg-gray-100 text-gray-900' : 'text-gray-700'}`}
+                      key={task.id}
+                      onClick={() => { setQuickSelectedTask(task.id); quickTaskDropdown.setIsOpen(false) }}
+                      className={`px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 truncate ${quickSelectedTask === task.id ? 'bg-gray-100 text-gray-900' : 'text-gray-700'}`}
                     >
                       {task.title}
                     </div>
@@ -328,9 +328,9 @@ function ActivitiesPage() {
                     </div>
                     {tasks.map(task => (
                       <div
-                        key={task.occurrence_id}
-                        onClick={() => { setManualSelectedTask(task.occurrence_id); manualTaskDropdown.setIsOpen(false) }}
-                        className={`px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 truncate ${manualSelectedTask === task.occurrence_id ? 'bg-gray-100 text-gray-900' : 'text-gray-700'}`}
+                        key={task.id}
+                        onClick={() => { setManualSelectedTask(task.id); manualTaskDropdown.setIsOpen(false) }}
+                        className={`px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 truncate ${manualSelectedTask === task.id ? 'bg-gray-100 text-gray-900' : 'text-gray-700'}`}
                       >
                         {task.title}
                       </div>
@@ -518,9 +518,9 @@ function ActivitiesPage() {
                         </div>
                         {tasks.map(task => (
                           <div
-                            key={task.occurrence_id}
-                            onClick={() => { setEditSelectedTask(task.occurrence_id); editTaskDropdown.setIsOpen(false) }}
-                            className={`px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 truncate ${editSelectedTask === task.occurrence_id ? 'bg-gray-100 text-gray-900' : 'text-gray-700'}`}
+                            key={task.id}
+                            onClick={() => { setEditSelectedTask(task.id); editTaskDropdown.setIsOpen(false) }}
+                            className={`px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 truncate ${editSelectedTask === task.id ? 'bg-gray-100 text-gray-900' : 'text-gray-700'}`}
                           >
                             {task.title}
                           </div>

@@ -3,8 +3,7 @@ import {
   getTasks,
   createTask as createTaskService,
   updateTask as updateTaskService,
-  deleteTask as deleteTaskService,
-  completeTaskOccurrence as completeTaskOccurrenceService
+  deleteTask as deleteTaskService
 } from '../services/taskService'
 
 function useTasks() {
@@ -83,15 +82,8 @@ function useTasks() {
     return response
   }
 
-  const handleCompleteTaskOccurrence = async (occurrenceId, actualMinutes = 0) => {
-    const response = await completeTaskOccurrenceService(occurrenceId, actualMinutes)
-    if (response.success) {
-      await loadTasks()
-    } else {
-      setError(response.error)
-    }
-    return response
-  }
+  // TODO: handleCompleteTaskOccurrence function removed during final cleanup
+// No longer using occurrence-based architecture
 
   useEffect(() => {
     loadTasks()
@@ -105,7 +97,8 @@ function useTasks() {
     createTask: handleCreateTask,
     updateTask: handleUpdateTask,
     deleteTask: handleDeleteTask,
-    completeTaskOccurrence: handleCompleteTaskOccurrence
+    // TODO: completeTaskOccurrence removed during final cleanup
+    // No longer using occurrence-based architecture
   }
 }
 

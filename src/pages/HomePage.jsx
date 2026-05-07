@@ -159,16 +159,16 @@ function HomePage({ openTaskModal, taskRefreshTrigger = 0, onActivityStarted, on
 
     const inProgressTasks = tasks.filter(task => {
       if (task.status !== 'in_progress') return false
-      if (!task.occurrence_date) return true
-      const taskDate = new Date(task.occurrence_date)
+      if (!task.scheduled_date) return true
+      const taskDate = new Date(task.scheduled_date)
       taskDate.setHours(0, 0, 0, 0)
       return taskDate.getTime() === targetDate.getTime()
     })
 
     const todoTasks = tasks.filter(task => {
       if (task.status !== 'todo') return false
-      if (!task.occurrence_date) return true
-      const taskDate = new Date(task.occurrence_date)
+      if (!task.scheduled_date) return true
+      const taskDate = new Date(task.scheduled_date)
       taskDate.setHours(0, 0, 0, 0)
       return taskDate.getTime() === targetDate.getTime()
     })
@@ -192,11 +192,11 @@ function HomePage({ openTaskModal, taskRefreshTrigger = 0, onActivityStarted, on
     
     return tasks.filter(task => {
       if (task.status === 'completed') return false
-      if (!task.occurrence_date) return false
-      const taskDate = new Date(task.occurrence_date)
+      if (!task.scheduled_date) return false
+      const taskDate = new Date(task.scheduled_date)
       taskDate.setHours(0, 0, 0, 0)
       return taskDate.getTime() < today.getTime()
-    }).sort((a, b) => new Date(a.occurrence_date) - new Date(b.occurrence_date))
+    }).sort((a, b) => new Date(a.scheduled_date) - new Date(b.scheduled_date))
   }
 
 
@@ -257,7 +257,7 @@ function HomePage({ openTaskModal, taskRefreshTrigger = 0, onActivityStarted, on
                             <div className="space-y-2">
                               {getOverdueTasks().map((task) => (
                                 <TaskCard
-                                  key={task.occurrence_id}
+                                  key={task.id}
                                   task={task}
                                   projects={projects}
                                   onToggleComplete={handleToggleComplete}
@@ -284,7 +284,7 @@ function HomePage({ openTaskModal, taskRefreshTrigger = 0, onActivityStarted, on
                               <div className="space-y-2">
                                 {inProgressItems.map((task) => (
                                   <TaskCard
-                                    key={task.occurrence_id}
+                                    key={task.id}
                                     task={task}
                                     projects={projects}
                                     onToggleComplete={handleToggleComplete}
@@ -312,7 +312,7 @@ function HomePage({ openTaskModal, taskRefreshTrigger = 0, onActivityStarted, on
                               <div className="space-y-2">
                                 {todoItems.map((task) => (
                                   <TaskCard
-                                    key={task.occurrence_id}
+                                    key={task.id}
                                     task={task}
                                     projects={projects}
                                     onToggleComplete={handleToggleComplete}

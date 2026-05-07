@@ -29,7 +29,7 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
   useEffect(() => {
     console.log('[DEBUG] TasksPage tasks state updated:', tasks.length, 'tasks')
     tasks.forEach((task, i) => {
-      console.log(`[DEBUG] TasksPage tasks[${i}] occurrence_id=${task.occurrence_id}, task_id=${task.task_id}, title="${task.title}", status="${task.status}", occurrence_date="${task.occurrence_date}"`)
+      console.log(`[DEBUG] TasksPage tasks[${i}] id=${task.id}, title="${task.title}", status="${task.status}"`)
     })
   }, [tasks])
 
@@ -193,17 +193,17 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
 
   const handleToggleComplete = async (task) => {
     const newStatus = task.status === 'completed' ? 'todo' : 'completed'
-    // Status is an occurrence field, so send occurrence_id with all required fields
+    // TODO: Occurrence logic removed during frontend simplification
+    // Now using single-task CRUD architecture
     const response = await updateTask({
-      occurrence_id: task.occurrence_id,
-      task_id: task.task_id,
-      occurrence_date: task.occurrence_date,
-      due_date: task.due_date,
+      id: task.id,
       status: newStatus,
-      actual_minutes: task.actual_minutes,
-      started_at: task.started_at,
-      completed_at: newStatus === 'completed' ? new Date().toISOString() : null,
-      reminder_generated: task.reminder_generated || 0
+      title: task.title,
+      description: task.description,
+      priority: task.priority,
+      due_date: task.due_date,
+      scheduled_date: task.scheduled_date,
+      project_id: task.project_id
     })
     if (!response.success) {
       console.error('Error toggling task completion:', response.error)
@@ -220,41 +220,42 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
     const today = new Date()
     today.setHours(0, 0, 0, 0)
 
-    // Project filter
-    if (selectedProjects.length > 0) {
-      filtered = filtered.filter(t => selectedProjects.includes(t.project_id))
-    }
-    
     if (filterOption === 'today') {
       filtered = filtered.filter(t => {
-        if (!t.occurrence_date) return false
-        const occurrenceDate = new Date(t.occurrence_date)
-        occurrenceDate.setHours(0, 0, 0, 0)
-        return occurrenceDate.getTime() === today.getTime()
+        if (!t.scheduled_date) return false
+        const scheduledDate = new Date(t.scheduled_date)
+        scheduledDate.setHours(0, 0, 0, 0)
+        return scheduledDate.getTime() === today.getTime()
       })
     } else if (filterOption === 'this_week') {
       const startOfWeek = new Date(today)
       startOfWeek.setDate(today.getDate() - today.getDay())
       startOfWeek.setHours(0, 0, 0, 0)
+      
       const endOfWeek = new Date(startOfWeek)
       endOfWeek.setDate(startOfWeek.getDate() + 6)
       endOfWeek.setHours(23, 59, 59, 999)
       
       filtered = filtered.filter(t => {
-        if (!t.occurrence_date) return false
-        const occurrenceDate = new Date(t.occurrence_date)
-        return occurrenceDate >= startOfWeek && occurrenceDate <= endOfWeek
+        if (!t.scheduled_date) return false
+        const scheduledDate = new Date(t.scheduled_date)
+        return scheduledDate >= startOfWeek && scheduledDate <= endOfWeek
       })
     }
-    
+
+    // Project filter
+    if (selectedProjects.length > 0) {
+      filtered = filtered.filter(t => t.project_id && selectedProjects.includes(t.project_id))
+    }
+
     // Sort
     return [...filtered].sort((a, b) => {
       switch (sortOption) {
         case 'due_date':
-          if (!a.occurrence_date && !b.occurrence_date) return 0
-          if (!a.occurrence_date) return 1
-          if (!b.occurrence_date) return -1
-          return new Date(a.occurrence_date) - new Date(b.occurrence_date)
+          if (!a.scheduled_date && !b.scheduled_date) return 0
+          if (!a.scheduled_date) return 1
+          if (!b.scheduled_date) return -1
+          return new Date(a.scheduled_date) - new Date(b.scheduled_date)
         case 'priority':
           const priorityOrder = { high: 0, medium: 1, low: 2 }
           return (priorityOrder[a.priority] || 1) - (priorityOrder[b.priority] || 1)
@@ -276,7 +277,7 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
   useEffect(() => {
     console.log('[DEBUG] TasksPage allTasks (filtered):', allTasks.length, 'tasks')
     allTasks.forEach((task, i) => {
-      console.log(`[DEBUG] TasksPage allTasks[${i}] occurrence_id=${task.occurrence_id}, task_id=${task.task_id}, title="${task.title}", status="${task.status}"`)
+      console.log(`[DEBUG] TasksPage allTasks[${i}] id=${task.id}, title="${task.title}", status="${task.status}"`)
     })
     console.log('[DEBUG] TasksPage pendingTasks:', pendingTasks.length, 'tasks')
     console.log('[DEBUG] TasksPage inProgressTasks:', inProgressTasks.length, 'tasks')
@@ -598,10 +599,10 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
                   <div className="flex-1 overflow-auto no-scrollbar p-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-max">
                       {visibleTasks.map(task => {
-                        console.log(`[DEBUG] Rendering TaskCard with key=${task.occurrence_id}, title="${task.title}"`)
+                        console.log(`[DEBUG] Rendering TaskCard with key=${task.id}, title="${task.title}"`)
                         return (
                           <TaskCard
-                            key={task.occurrence_id}
+                            key={task.id}
                             task={task}
                             projects={projects}
                             onToggleComplete={handleToggleComplete}

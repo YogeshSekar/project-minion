@@ -573,7 +573,7 @@ function ProjectsPage({ runningActivity: propRunningActivity, onActivityStarted,
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {oneTimeTasks.map((task) => (
                               <TaskCard
-                                key={task.occurrence_id}
+                                key={task.id}
                                 task={task}
                                 projects={projects}
                                 onToggleComplete={handleToggleComplete}
@@ -617,7 +617,7 @@ function ProjectsPage({ runningActivity: propRunningActivity, onActivityStarted,
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {filteredTasks.map((task) => (
                           <TaskCard
-                            key={task.occurrence_id}
+                            key={task.id}
                             task={task}
                             projects={projects}
                             onToggleComplete={handleToggleComplete}

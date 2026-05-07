@@ -14,7 +14,7 @@ function TaskSidePanel({
   onRefreshProjects = null,
   onDelete = null
 }) {
-  const panelKey = `${mode}-${task?.occurrence_id || task?.id || 'new'}`
+  const panelKey = `${mode}-${task?.id || 'new'}`
   
   useEffect(() => {
     if (isOpen) {
@@ -26,12 +26,8 @@ function TaskSidePanel({
         status: task?.status || 'todo',
         due_date: task?.due_date || '',
         scheduled_date: task?.scheduled_date || '',
-        estimated_minutes: task?.estimated_minutes || 0,
-        actual_minutes: task?.actual_minutes || 0,
-        is_recurring: task?.is_recurring || 0,
-        recurrence_rule: task?.recurrence_rule || '',
-        recurrence_end_date: task?.recurrence_end_date || '',
-        parent_task_id: task?.parent_task_id || null
+        // TODO: Occurrence fields removed during frontend simplification
+        // Now using single-task CRUD architecture
       })
       setErrors({})
     }
@@ -45,12 +41,8 @@ function TaskSidePanel({
     status: 'todo',
     due_date: '',
     scheduled_date: '',
-    estimated_minutes: 0,
-    actual_minutes: 0,
-    is_recurring: 0,
-    recurrence_rule: '',
-    recurrence_end_date: '',
-    parent_task_id: null
+    // TODO: Occurrence fields removed during frontend simplification
+    // Now using single-task CRUD architecture
   })
 
   const [errors, setErrors] = useState({})
@@ -116,59 +108,40 @@ function TaskSidePanel({
         }
       } else {
         console.log('[DEBUG] TaskSidePanel editing task, original task:', task)
-        // Split update into parent task and occurrence updates
-        const parentTaskPayload = {
-          id: task.task_id,
+        // TODO: Occurrence split logic removed during frontend simplification
+        // Now using single-task CRUD architecture
+        const taskPayload = {
+          id: task.task_id || task.id,
           title: formData.title,
           description: formData.description,
           status: formData.status,
           priority: formData.priority,
           due_date: formData.due_date || null,
           scheduled_date: formData.scheduled_date || null,
-          estimated_minutes: formData.estimated_minutes || 0,
-          is_recurring: formData.is_recurring || 0,
-          recurrence_rule: formData.recurrence_rule || null,
-          recurrence_end_date: formData.recurrence_end_date || null,
-          parent_task_id: formData.parent_task_id || null,
           project_id: formData.project_id || null
         }
-        console.log('[DEBUG] TaskSidePanel parent task payload:', parentTaskPayload)
+        console.log('[DEBUG] TaskSidePanel task payload:', taskPayload)
 
-        const occurrencePayload = {
-          id: task.occurrence_id,
-          task_id: task.task_id,
-          occurrence_date: task.occurrence_date || formData.scheduled_date || '',
-          due_date: formData.due_date || null,
-          status: formData.status,
-          actual_minutes: formData.actual_minutes || 0,
-          started_at: task.started_at || null,
-          completed_at: formData.status === 'completed' ? new Date().toISOString() : (task.completed_at || null),
-          reminder_generated: task.reminder_generated || 0
-        }
-        console.log('[DEBUG] TaskSidePanel occurrence payload:', occurrencePayload)
-
-        // Update parent task first
-        console.log('[DEBUG] TaskSidePanel calling onUpdateTask for parent task')
-        const parentResponse = await onUpdateTask(parentTaskPayload)
-        console.log('[DEBUG] TaskSidePanel parent response:', parentResponse)
-        if (!parentResponse.success) {
-          console.log('[DEBUG] TaskSidePanel parent update failed')
-          setErrors({ submit: parentResponse.error })
+        // Update task
+        console.log('[DEBUG] TaskSidePanel calling onUpdateTask')
+        const response = await onUpdateTask(taskPayload)
+        console.log('[DEBUG] TaskSidePanel response:', response)
+        if (!response.success) {
+          console.log('[DEBUG] TaskSidePanel update failed')
+          setErrors({ submit: response.error })
           setIsLoading(false)
           return
         }
 
-        // Then update occurrence
-        console.log('[DEBUG] TaskSidePanel calling onUpdateTask for occurrence')
-        const occurrenceResponse = await onUpdateTask({ ...occurrencePayload, occurrence_id: task.occurrence_id })
-        console.log('[DEBUG] TaskSidePanel occurrence response:', occurrenceResponse)
-        if (occurrenceResponse.success) {
+        // TODO: Occurrence update logic removed during frontend simplification
+        // Now using single-task CRUD architecture
+        if (response.success) {
           console.log('[DEBUG] TaskSidePanel save successful, calling onSave')
-          onSave(occurrenceResponse.data)
+          onSave(response.data)
           onClose()
         } else {
-          console.log('[DEBUG] TaskSidePanel occurrence update failed')
-          setErrors({ submit: occurrenceResponse.error })
+          console.log('[DEBUG] TaskSidePanel update failed')
+          setErrors({ submit: response.error })
         }
       }
     } catch (error) {
@@ -226,7 +199,7 @@ function TaskSidePanel({
   const handleDelete = async () => {
     if (task && onDelete) {
       if (window.confirm('Are you sure you want to delete this task?')) {
-        await onDelete(task.occurrence_id)
+        await onDelete(task.id)
         onClose()
       }
     }

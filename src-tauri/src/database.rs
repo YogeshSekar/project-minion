@@ -1,7 +1,6 @@
 use serde::{Deserialize, Serialize};
 use sqlx::{sqlite::SqlitePoolOptions, Pool, Sqlite};
 use std::path::PathBuf;
-use chrono::Datelike;
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Project {
@@ -49,11 +48,6 @@ pub struct Task {
     pub due_date: Option<String>,
     pub scheduled_date: Option<String>,
     pub project_id: Option<i64>,
-    pub parent_task_id: Option<i64>,
-    pub estimated_minutes: Option<i64>,
-    pub is_recurring: Option<i64>,
-    pub recurrence_rule: Option<String>,
-    pub recurrence_end_date: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -67,11 +61,6 @@ pub struct CreateTaskRequest {
     pub due_date: Option<String>,
     pub scheduled_date: Option<String>,
     pub project_id: Option<i64>,
-    pub parent_task_id: Option<i64>,
-    pub estimated_minutes: Option<i64>,
-    pub is_recurring: Option<i64>,
-    pub recurrence_rule: Option<String>,
-    pub recurrence_end_date: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -84,99 +73,16 @@ pub struct UpdateTaskRequest {
     pub due_date: Option<String>,
     pub scheduled_date: Option<String>,
     pub project_id: Option<i64>,
-    pub parent_task_id: Option<i64>,
-    pub estimated_minutes: Option<i64>,
-    pub is_recurring: Option<i64>,
-    pub recurrence_rule: Option<String>,
-    pub recurrence_end_date: Option<String>,
 }
 
-// TaskOccurrence structs
-#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
-pub struct TaskOccurrence {
-    pub id: i64,
-    pub task_id: i64,
-    pub occurrence_date: String,
-    pub due_date: Option<String>,
-    pub status: String,
-    pub actual_minutes: i64,
-    pub started_at: Option<String>,
-    pub completed_at: Option<String>,
-    pub reminder_generated: i64,
-    pub created_at: String,
-}
+// TODO: TaskOccurrence structs removed during final cleanup
+// No longer using occurrence-based architecture
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CreateTaskOccurrenceRequest {
-    pub task_id: i64,
-    pub occurrence_date: String,
-    pub due_date: Option<String>,
-    pub status: String,
-}
+// TODO: TaskReminder structs removed during final cleanup
+// No longer using occurrence-based reminder system
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct UpdateTaskOccurrenceRequest {
-    pub id: i64,
-    pub task_id: i64,
-    pub occurrence_date: String,
-    pub due_date: Option<String>,
-    pub status: String,
-    pub actual_minutes: i64,
-    pub started_at: Option<String>,
-    pub completed_at: Option<String>,
-    pub reminder_generated: i64,
-}
-
-// TaskReminder structs
-#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
-pub struct TaskReminder {
-    pub id: i64,
-    pub occurrence_id: i64,
-    pub reminder_time: String,
-    pub is_sent: i64,
-    pub created_at: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CreateTaskReminderRequest {
-    pub occurrence_id: i64,
-    pub reminder_time: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct UpdateTaskReminderRequest {
-    pub id: i64,
-    pub occurrence_id: i64,
-    pub reminder_time: String,
-    pub is_sent: i64,
-}
-
-// Unified TaskView DTO for frontend consumption
-// Combines data from tasks, task_occurrences, and reminder counts
-#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
-pub struct TaskView {
-    pub occurrence_id: i64,
-    pub task_id: i64,
-    pub title: String,
-    pub description: Option<String>,
-    pub status: String,
-    pub priority: String,
-    pub due_date: Option<String>,
-    pub scheduled_date: Option<String>,
-    pub estimated_minutes: Option<i64>,
-    pub actual_minutes: i64,
-    pub is_recurring: Option<i64>,
-    pub recurrence_rule: Option<String>,
-    pub recurrence_end_date: Option<String>,
-    pub parent_task_id: Option<i64>,
-    pub project_id: Option<i64>,
-    pub occurrence_date: String,
-    pub started_at: Option<String>,
-    pub completed_at: Option<String>,
-    pub reminder_count: i64,
-    pub created_at: String,
-    pub updated_at: String,
-}
+// TODO: TaskView compatibility layer removed during final cleanup
+// Frontend now uses Task struct directly
 
 // Meeting structs
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
@@ -430,11 +336,6 @@ pub async fn init_db(app_data_dir: PathBuf) -> Result<Pool<Sqlite>, sqlx::Error>
             due_date TEXT,
             scheduled_date TEXT,
             project_id INTEGER,
-            parent_task_id INTEGER,
-            estimated_minutes INTEGER DEFAULT 0,
-            is_recurring INTEGER DEFAULT 0,
-            recurrence_rule TEXT,
-            recurrence_end_date TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
@@ -491,76 +392,11 @@ pub async fn init_db(app_data_dir: PathBuf) -> Result<Pool<Sqlite>, sqlx::Error>
     .execute(&pool)
     .await?;
 
-    // Create task_occurrences table
-    sqlx::query(
-        r#"
-        CREATE TABLE IF NOT EXISTS task_occurrences (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            task_id INTEGER NOT NULL,
-            occurrence_date TEXT NOT NULL,
-            due_date TEXT,
-            status TEXT NOT NULL DEFAULT 'todo',
-            actual_minutes INTEGER DEFAULT 0,
-            started_at DATETIME,
-            completed_at DATETIME,
-            reminder_generated INTEGER DEFAULT 0,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
-        )
-        "#,
-    )
-    .execute(&pool)
-    .await?;
+    // TODO: task_occurrences table creation removed during final cleanup
+// No longer using occurrence-based architecture
 
-    // Create indexes for task_occurrences
-    sqlx::query(
-        r#"
-        CREATE INDEX IF NOT EXISTS idx_task_occurrences_task_id ON task_occurrences(task_id)
-        "#,
-    )
-    .execute(&pool)
-    .await?;
-
-    sqlx::query(
-        r#"
-        CREATE INDEX IF NOT EXISTS idx_task_occurrences_occurrence_date ON task_occurrences(occurrence_date)
-        "#,
-    )
-    .execute(&pool)
-    .await?;
-
-    sqlx::query(
-        r#"
-        CREATE INDEX IF NOT EXISTS idx_task_occurrences_status ON task_occurrences(status)
-        "#,
-    )
-    .execute(&pool)
-    .await?;
-
-    // Create task_reminders table
-    sqlx::query(
-        r#"
-        CREATE TABLE IF NOT EXISTS task_reminders (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            occurrence_id INTEGER NOT NULL,
-            reminder_time TEXT NOT NULL,
-            is_sent INTEGER DEFAULT 0,
-            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (occurrence_id) REFERENCES task_occurrences(id) ON DELETE CASCADE
-        )
-        "#,
-    )
-    .execute(&pool)
-    .await?;
-
-    // Create index for task_reminders
-    sqlx::query(
-        r#"
-        CREATE INDEX IF NOT EXISTS idx_task_reminders_occurrence_id ON task_reminders(occurrence_id)
-        "#,
-    )
-    .execute(&pool)
-    .await?;
+    // TODO: task_reminders table creation removed during final cleanup
+// No longer using occurrence-based reminder system
 
     // Create notes table
     sqlx::query(
@@ -686,8 +522,8 @@ pub async fn create_task(
 ) -> Result<Task, sqlx::Error> {
     let task = sqlx::query_as::<_, Task>(
         r#"
-        INSERT INTO tasks (title, description, status, priority, due_date, scheduled_date, project_id, parent_task_id, estimated_minutes, is_recurring, recurrence_rule, recurrence_end_date)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+        INSERT INTO tasks (title, description, status, priority, due_date, scheduled_date, project_id)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
         RETURNING *
         "#,
     )
@@ -698,32 +534,12 @@ pub async fn create_task(
     .bind(&req.due_date)
     .bind(&req.scheduled_date)
     .bind(req.project_id)
-    .bind(req.parent_task_id)
-    .bind(req.estimated_minutes)
-    .bind(req.is_recurring)
-    .bind(&req.recurrence_rule)
-    .bind(&req.recurrence_end_date)
     .fetch_one(pool)
     .await?;
 
-    // Automatically create first occurrence for the task
-    let occurrence_date = req.scheduled_date.as_ref().or(req.due_date.as_ref()).cloned().unwrap_or_else(|| {
-        chrono::Utc::now().format("%Y-%m-%d").to_string()
-    });
-
-    let _occurrence = sqlx::query_as::<_, TaskOccurrence>(
-        r#"
-        INSERT INTO task_occurrences (task_id, occurrence_date, due_date, status)
-        VALUES (?1, ?2, ?3, ?4)
-        RETURNING *
-        "#,
-    )
-    .bind(task.id)
-    .bind(&occurrence_date)
-    .bind(&req.due_date)
-    .bind(&req.status)
-    .fetch_one(pool)
-    .await?;
+    // TODO: Occurrence generation temporarily removed during CRUD simplification
+    // Previously created first occurrence for each task
+    // Now using single-task CRUD architecture
 
     Ok(task)
 }
@@ -736,10 +552,8 @@ pub async fn update_task(
         r#"
         UPDATE tasks 
         SET title = ?1, description = ?2, status = ?3, priority = ?4, 
-            due_date = ?5, scheduled_date = ?6, project_id = ?7, parent_task_id = ?8,
-            estimated_minutes = ?9, is_recurring = ?10, recurrence_rule = ?11, 
-            recurrence_end_date = ?12, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?13
+            due_date = ?5, scheduled_date = ?6, project_id = ?7, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?8
         RETURNING *
         "#,
     )
@@ -750,11 +564,6 @@ pub async fn update_task(
     .bind(&req.due_date)
     .bind(&req.scheduled_date)
     .bind(req.project_id)
-    .bind(req.parent_task_id)
-    .bind(req.estimated_minutes)
-    .bind(req.is_recurring)
-    .bind(&req.recurrence_rule)
-    .bind(&req.recurrence_end_date)
     .bind(req.id)
     .fetch_one(pool)
     .await?;
@@ -762,356 +571,36 @@ pub async fn update_task(
     Ok(task)
 }
 
-// TaskView functions - return unified flattened task data for frontend
-pub async fn get_all_task_views(pool: &Pool<Sqlite>) -> Result<Vec<TaskView>, sqlx::Error> {
-    let task_views = sqlx::query_as::<_, TaskView>(
+// Simple task CRUD functions
+pub async fn get_all_tasks(pool: &Pool<Sqlite>) -> Result<Vec<Task>, sqlx::Error> {
+    let tasks = sqlx::query_as::<_, Task>(
         r#"
-        SELECT
-            COALESCE(to_occ.id, t.id) as occurrence_id,
-            t.id as task_id,
-            t.title,
-            t.description,
-            COALESCE(to_occ.status, t.status) as status,
-            t.priority,
-            t.due_date,
-            t.scheduled_date,
-            t.estimated_minutes,
-            COALESCE(to_occ.actual_minutes, 0) as actual_minutes,
-            t.is_recurring,
-            t.recurrence_rule,
-            t.recurrence_end_date,
-            t.parent_task_id,
-            t.project_id,
-            COALESCE(to_occ.occurrence_date, t.scheduled_date) as occurrence_date,
-            to_occ.started_at,
-            to_occ.completed_at,
-            COALESCE(COUNT(tr.id), 0) as reminder_count,
-            t.created_at,
-            t.updated_at
-        FROM tasks t
-        LEFT JOIN task_occurrences to_occ ON to_occ.task_id = t.id
-        LEFT JOIN task_reminders tr ON tr.occurrence_id = to_occ.id
-        GROUP BY t.id, to_occ.id
-        ORDER BY t.created_at DESC
+        SELECT * FROM tasks ORDER BY created_at DESC
         "#,
     )
     .fetch_all(pool)
     .await?;
 
-    // DEBUG: Log raw SQL query results
-    println!("[DEBUG] get_all_task_views: Returned {} task views", task_views.len());
-    for (i, tv) in task_views.iter().enumerate() {
-        println!("[DEBUG] TaskView[{}]: occurrence_id={}, task_id={}, title='{}', status='{}', occurrence_date='{}'",
-            i, tv.occurrence_id, tv.task_id, tv.title, tv.status, tv.occurrence_date);
-    }
-
-    Ok(task_views)
+    Ok(tasks)
 }
 
-pub async fn get_task_views_by_project(pool: &Pool<Sqlite>, project_id: i64) -> Result<Vec<TaskView>, sqlx::Error> {
-    let task_views = sqlx::query_as::<_, TaskView>(
-        r#"
-        SELECT
-            COALESCE(to_occ.id, t.id) as occurrence_id,
-            t.id as task_id,
-            t.title,
-            t.description,
-            COALESCE(to_occ.status, t.status) as status,
-            t.priority,
-            t.due_date,
-            t.scheduled_date,
-            t.estimated_minutes,
-            COALESCE(to_occ.actual_minutes, 0) as actual_minutes,
-            t.is_recurring,
-            t.recurrence_rule,
-            t.recurrence_end_date,
-            t.parent_task_id,
-            t.project_id,
-            COALESCE(to_occ.occurrence_date, t.scheduled_date) as occurrence_date,
-            to_occ.started_at,
-            to_occ.completed_at,
-            COALESCE(COUNT(tr.id), 0) as reminder_count,
-            t.created_at,
-            t.updated_at
-        FROM tasks t
-        LEFT JOIN task_occurrences to_occ ON to_occ.task_id = t.id
-        LEFT JOIN task_reminders tr ON tr.occurrence_id = to_occ.id
-        WHERE t.project_id = ?1
-        GROUP BY t.id, to_occ.id
-        ORDER BY t.created_at DESC
-        "#,
-    )
-    .bind(project_id)
-    .fetch_all(pool)
-    .await?;
-
-    Ok(task_views)
-}
-
-pub async fn get_task_view_by_occurrence(pool: &Pool<Sqlite>, occurrence_id: i64) -> Result<Option<TaskView>, sqlx::Error> {
-    let task_view = sqlx::query_as::<_, TaskView>(
-        r#"
-        SELECT
-            to.id as occurrence_id,
-            t.id as task_id,
-            t.title,
-            t.description,
-            to.status,
-            t.priority,
-            t.due_date,
-            t.scheduled_date,
-            t.estimated_minutes,
-            to.actual_minutes,
-            t.is_recurring,
-            t.recurrence_rule,
-            t.recurrence_end_date,
-            t.parent_task_id,
-            t.project_id,
-            to.occurrence_date,
-            to.started_at,
-            to.completed_at,
-            COALESCE(COUNT(tr.id), 0) as reminder_count,
-            t.created_at,
-            t.updated_at
-        FROM task_occurrences to
-        INNER JOIN tasks t ON to.task_id = t.id
-        LEFT JOIN task_reminders tr ON tr.occurrence_id = to.id
-        WHERE to.id = ?1
-        GROUP BY to.id, t.id
-        "#,
-    )
-    .bind(occurrence_id)
-    .fetch_optional(pool)
-    .await?;
-
-    Ok(task_view)
-}
-
-// Complete a task occurrence and optionally generate next occurrence for recurring tasks
-pub async fn complete_task_occurrence(
-    pool: &Pool<Sqlite>,
-    occurrence_id: i64,
-    actual_minutes: i64,
-) -> Result<TaskOccurrence, sqlx::Error> {
-    // First, get the occurrence to find its task
-    let occurrence = sqlx::query_as::<_, TaskOccurrence>(
-        r#"
-        SELECT * FROM task_occurrences WHERE id = ?1
-        "#,
-    )
-    .bind(occurrence_id)
-    .fetch_one(pool)
-    .await?;
-
-    // Update the occurrence as completed
-    let updated_occurrence = sqlx::query_as::<_, TaskOccurrence>(
-        r#"
-        UPDATE task_occurrences 
-        SET status = 'completed', actual_minutes = ?1, completed_at = CURRENT_TIMESTAMP
-        WHERE id = ?2
-        RETURNING *
-        "#,
-    )
-    .bind(actual_minutes)
-    .bind(occurrence_id)
-    .fetch_one(pool)
-    .await?;
-
-    // Check if the parent task is recurring and generate next occurrence
+pub async fn get_task_by_id(pool: &Pool<Sqlite>, id: i64) -> Result<Option<Task>, sqlx::Error> {
     let task = sqlx::query_as::<_, Task>(
         r#"
         SELECT * FROM tasks WHERE id = ?1
         "#,
     )
-    .bind(occurrence.task_id)
-    .fetch_one(pool)
-    .await?;
-
-    if task.is_recurring == Some(1) && task.recurrence_rule.is_some() {
-        // Check if recurrence has ended
-        if let Some(end_date) = &task.recurrence_end_date {
-            let current_date = chrono::Utc::now().format("%Y-%m-%d").to_string();
-            if current_date > *end_date {
-                return Ok(updated_occurrence);
-            }
-        }
-
-        // Calculate next occurrence date based on recurrence rule
-        let next_date = calculate_next_occurrence(&occurrence.occurrence_date, task.recurrence_rule.as_ref().unwrap())?;
-
-        // Create next occurrence
-        let _next_occurrence = sqlx::query_as::<_, TaskOccurrence>(
-            r#"
-            INSERT INTO task_occurrences (task_id, occurrence_date, due_date, status)
-            VALUES (?1, ?2, ?3, 'todo')
-            RETURNING *
-            "#,
-        )
-        .bind(task.id)
-        .bind(&next_date)
-        .bind(&task.due_date)
-        .fetch_one(pool)
-        .await?;
-    }
-
-    Ok(updated_occurrence)
-}
-
-// Helper function to calculate next occurrence date based on recurrence rule
-fn calculate_next_occurrence(current_date: &str, recurrence_rule: &str) -> Result<String, sqlx::Error> {
-    let date = chrono::NaiveDate::parse_from_str(current_date, "%Y-%m-%d")
-        .map_err(|e| sqlx::Error::Io(std::io::Error::new(std::io::ErrorKind::InvalidData, e)))?;
-
-    let next_date = match recurrence_rule {
-        "daily" => date + chrono::Duration::days(1),
-        "weekly" => date + chrono::Duration::weeks(1),
-        "biweekly" => date + chrono::Duration::weeks(2),
-        "monthly" => {
-            // Add one month
-            let mut next = date.clone();
-            if next.month() == 12 {
-                next = date.with_year(next.year() + 1).unwrap();
-                next = next.with_month(1).unwrap();
-            } else {
-                next = next.with_month(next.month() + 1).unwrap();
-            }
-            next
-        }
-        _ => return Err(sqlx::Error::Io(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            format!("Unknown recurrence rule: {}", recurrence_rule)
-        ))),
-    };
-
-    Ok(next_date.format("%Y-%m-%d").to_string())
-}
-
-// TaskOccurrence CRUD operations
-pub async fn create_task_occurrence(
-    pool: &Pool<Sqlite>,
-    req: CreateTaskOccurrenceRequest,
-) -> Result<TaskOccurrence, sqlx::Error> {
-    let occurrence = sqlx::query_as::<_, TaskOccurrence>(
-        r#"
-        INSERT INTO task_occurrences (task_id, occurrence_date, due_date, status)
-        VALUES (?1, ?2, ?3, ?4)
-        RETURNING *
-        "#,
-    )
-    .bind(req.task_id)
-    .bind(&req.occurrence_date)
-    .bind(&req.due_date)
-    .bind(&req.status)
-    .fetch_one(pool)
-    .await?;
-
-    Ok(occurrence)
-}
-
-pub async fn get_all_task_occurrences(pool: &Pool<Sqlite>) -> Result<Vec<TaskOccurrence>, sqlx::Error> {
-    let occurrences = sqlx::query_as::<_, TaskOccurrence>(
-        r#"
-        SELECT * FROM task_occurrences ORDER BY occurrence_date DESC
-        "#,
-    )
-    .fetch_all(pool)
-    .await?;
-
-    Ok(occurrences)
-}
-
-pub async fn get_task_occurrences_by_task(pool: &Pool<Sqlite>, task_id: i64) -> Result<Vec<TaskOccurrence>, sqlx::Error> {
-    let occurrences = sqlx::query_as::<_, TaskOccurrence>(
-        r#"
-        SELECT * FROM task_occurrences WHERE task_id = ?1 ORDER BY occurrence_date DESC
-        "#,
-    )
-    .bind(task_id)
-    .fetch_all(pool)
-    .await?;
-
-    Ok(occurrences)
-}
-
-pub async fn get_task_occurrence_by_id(pool: &Pool<Sqlite>, id: i64) -> Result<Option<TaskOccurrence>, sqlx::Error> {
-    let occurrence = sqlx::query_as::<_, TaskOccurrence>(
-        r#"
-        SELECT * FROM task_occurrences WHERE id = ?1
-        "#,
-    )
     .bind(id)
     .fetch_optional(pool)
     .await?;
 
-    Ok(occurrence)
+    Ok(task)
 }
 
-pub async fn update_task_occurrence(
-    pool: &Pool<Sqlite>,
-    req: UpdateTaskOccurrenceRequest,
-) -> Result<TaskOccurrence, sqlx::Error> {
-    println!("[DEBUG] update_task_occurrence called with id={}, task_id={}, status={}", req.id, req.task_id, req.status);
-    
-    // First check if the occurrence exists
-    let exists: Option<i64> = sqlx::query_scalar("SELECT id FROM task_occurrences WHERE id = ?1")
-        .bind(req.id)
-        .fetch_optional(pool)
-        .await?;
-    
-    if exists.is_none() {
-        println!("[DEBUG] update_task_occurrence: occurrence id={} not found, creating it", req.id);
-        // Occurrence doesn't exist, create it instead (auto-generate ID since it's AUTOINCREMENT)
-        let occurrence = sqlx::query_as::<_, TaskOccurrence>(
-            r#"
-            INSERT INTO task_occurrences (task_id, occurrence_date, due_date, status, actual_minutes, started_at, completed_at, reminder_generated)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
-            RETURNING *
-            "#,
-        )
-        .bind(req.task_id)
-        .bind(&req.occurrence_date)
-        .bind(&req.due_date)
-        .bind(&req.status)
-        .bind(req.actual_minutes)
-        .bind(&req.started_at)
-        .bind(&req.completed_at)
-        .bind(req.reminder_generated)
-        .fetch_one(pool)
-        .await?;
-        println!("[DEBUG] update_task_occurrence created new occurrence id={}", occurrence.id);
-        return Ok(occurrence);
-    }
-    
-    let occurrence = sqlx::query_as::<_, TaskOccurrence>(
-        r#"
-        UPDATE task_occurrences 
-        SET task_id = ?1, occurrence_date = ?2, due_date = ?3, status = ?4,
-            actual_minutes = ?5, started_at = ?6, completed_at = ?7, 
-            reminder_generated = ?8
-        WHERE id = ?9
-        RETURNING *
-        "#,
-    )
-    .bind(req.task_id)
-    .bind(&req.occurrence_date)
-    .bind(&req.due_date)
-    .bind(&req.status)
-    .bind(req.actual_minutes)
-    .bind(&req.started_at)
-    .bind(&req.completed_at)
-    .bind(req.reminder_generated)
-    .bind(req.id)
-    .fetch_one(pool)
-    .await?;
-
-    println!("[DEBUG] update_task_occurrence successfully updated occurrence id={}", req.id);
-    Ok(occurrence)
-}
-
-pub async fn delete_task_occurrence(pool: &Pool<Sqlite>, id: i64) -> Result<(), sqlx::Error> {
+pub async fn delete_task(pool: &Pool<Sqlite>, id: i64) -> Result<(), sqlx::Error> {
     sqlx::query(
         r#"
-        DELETE FROM task_occurrences WHERE id = ?1
+        DELETE FROM tasks WHERE id = ?1
         "#,
     )
     .bind(id)
@@ -1121,98 +610,22 @@ pub async fn delete_task_occurrence(pool: &Pool<Sqlite>, id: i64) -> Result<(), 
     Ok(())
 }
 
-// TaskReminder CRUD operations
-pub async fn create_task_reminder(
-    pool: &Pool<Sqlite>,
-    req: CreateTaskReminderRequest,
-) -> Result<TaskReminder, sqlx::Error> {
-    let reminder = sqlx::query_as::<_, TaskReminder>(
-        r#"
-        INSERT INTO task_reminders (occurrence_id, reminder_time)
-        VALUES (?1, ?2)
-        RETURNING *
-        "#,
-    )
-    .bind(req.occurrence_id)
-    .bind(&req.reminder_time)
-    .fetch_one(pool)
-    .await?;
+// TODO: TaskView functions removed during final cleanup
+// Frontend now uses Task struct directly
 
-    Ok(reminder)
-}
+// TODO: complete_task_occurrence function temporarily removed during CRUD simplification
+// Previously handled occurrence completion and recurring task generation
+// Now using single-task CRUD architecture
 
-pub async fn get_all_task_reminders(pool: &Pool<Sqlite>) -> Result<Vec<TaskReminder>, sqlx::Error> {
-    let reminders = sqlx::query_as::<_, TaskReminder>(
-        r#"
-        SELECT * FROM task_reminders ORDER BY reminder_time ASC
-        "#,
-    )
-    .fetch_all(pool)
-    .await?;
+// TODO: calculate_next_occurrence function temporarily removed during CRUD simplification
+// Previously calculated next occurrence dates for recurring tasks
+// Recurrence logic has been removed from Task struct
 
-    Ok(reminders)
-}
+// TODO: TaskOccurrence CRUD operations removed during final cleanup
+// No longer using occurrence-based architecture
 
-pub async fn get_task_reminders_by_occurrence(pool: &Pool<Sqlite>, occurrence_id: i64) -> Result<Vec<TaskReminder>, sqlx::Error> {
-    let reminders = sqlx::query_as::<_, TaskReminder>(
-        r#"
-        SELECT * FROM task_reminders WHERE occurrence_id = ?1 ORDER BY reminder_time ASC
-        "#,
-    )
-    .bind(occurrence_id)
-    .fetch_all(pool)
-    .await?;
-
-    Ok(reminders)
-}
-
-pub async fn get_task_reminder_by_id(pool: &Pool<Sqlite>, id: i64) -> Result<Option<TaskReminder>, sqlx::Error> {
-    let reminder = sqlx::query_as::<_, TaskReminder>(
-        r#"
-        SELECT * FROM task_reminders WHERE id = ?1
-        "#,
-    )
-    .bind(id)
-    .fetch_optional(pool)
-    .await?;
-
-    Ok(reminder)
-}
-
-pub async fn update_task_reminder(
-    pool: &Pool<Sqlite>,
-    req: UpdateTaskReminderRequest,
-) -> Result<TaskReminder, sqlx::Error> {
-    let reminder = sqlx::query_as::<_, TaskReminder>(
-        r#"
-        UPDATE task_reminders 
-        SET occurrence_id = ?1, reminder_time = ?2, is_sent = ?3
-        WHERE id = ?4
-        RETURNING *
-        "#,
-    )
-    .bind(req.occurrence_id)
-    .bind(&req.reminder_time)
-    .bind(req.is_sent)
-    .bind(req.id)
-    .fetch_one(pool)
-    .await?;
-
-    Ok(reminder)
-}
-
-pub async fn delete_task_reminder(pool: &Pool<Sqlite>, id: i64) -> Result<(), sqlx::Error> {
-    sqlx::query(
-        r#"
-        DELETE FROM task_reminders WHERE id = ?1
-        "#,
-    )
-    .bind(id)
-    .execute(pool)
-    .await?;
-
-    Ok(())
-}
+// TODO: TaskReminder CRUD operations removed during final cleanup
+// No longer using occurrence-based reminder system
 
 // Meeting CRUD operations
 pub async fn create_meeting(

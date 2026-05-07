@@ -293,14 +293,14 @@ const UnifiedHeader = ({
                         </button>
                         {todayTasks.map(task => (
                           <button
-                            key={task.occurrence_id}
+                            key={task.id}
                             type="button"
                             onClick={() => {
                               setTrackedTask(task)
                               setShowTaskDropdown(false)
                             }}
                             className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 truncate whitespace-nowrap ${
-                              trackedTask?.occurrence_id === task.occurrence_id ? 'bg-gray-200 text-gray-900' : ''
+                              trackedTask?.id === task.id ? 'bg-gray-200 text-gray-900' : ''
                             }`}
                           >
                             {task.title}

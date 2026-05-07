@@ -6,20 +6,9 @@ use crate::database::{
     get_all_projects as db_get_all_projects, get_project_by_id as db_get_project_by_id,
     update_project as db_update_project, CreateProjectRequest, Project, UpdateProjectRequest,
     create_task as db_create_task,
-    update_task as db_update_task, CreateTaskRequest, Task, UpdateTaskRequest,
-    get_all_task_views as db_get_all_task_views, get_task_views_by_project as db_get_task_views_by_project,
-    get_task_view_by_occurrence as db_get_task_view_by_occurrence, TaskView,
-    complete_task_occurrence as db_complete_task_occurrence,
-    create_task_occurrence as db_create_task_occurrence, delete_task_occurrence as db_delete_task_occurrence,
-    get_all_task_occurrences as db_get_all_task_occurrences, get_task_occurrence_by_id as db_get_task_occurrence_by_id,
-    get_task_occurrences_by_task as db_get_task_occurrences_by_task,
-    update_task_occurrence as db_update_task_occurrence,
-    CreateTaskOccurrenceRequest, TaskOccurrence, UpdateTaskOccurrenceRequest,
-    create_task_reminder as db_create_task_reminder, delete_task_reminder as db_delete_task_reminder,
-    get_all_task_reminders as db_get_all_task_reminders, get_task_reminder_by_id as db_get_task_reminder_by_id,
-    get_task_reminders_by_occurrence as db_get_task_reminders_by_occurrence,
-    update_task_reminder as db_update_task_reminder,
-    CreateTaskReminderRequest, TaskReminder, UpdateTaskReminderRequest,
+    update_task as db_update_task, delete_task as db_delete_task, get_all_tasks as db_get_all_tasks, CreateTaskRequest, Task, UpdateTaskRequest,
+    // TODO: TaskView and occurrence-related imports removed during final cleanup
+    // Frontend now uses Task struct directly
     create_meeting as db_create_meeting, delete_meeting as db_delete_meeting,
     get_all_meetings as db_get_all_meetings, get_meeting_by_id as db_get_meeting_by_id,
     get_meetings_by_date as db_get_meetings_by_date,
@@ -175,66 +164,18 @@ pub async fn create_task(
     }
 }
 
-// TaskView commands - return unified flattened task data for frontend
-#[tauri::command]
-pub async fn get_all_task_views(
-    state: State<'_, DbState>,
-) -> Result<ApiResponse<Vec<TaskView>>, String> {
-    match db_get_all_task_views(&state.pool).await {
-        Ok(task_views) => {
-            // DEBUG: Log Tauri command response
-            println!("[DEBUG] get_all_task_views command: Returning {} task views to frontend", task_views.len());
-            Ok(ApiResponse {
-                success: true,
-                data: Some(task_views),
-                error: None,
-            })
-        },
-        Err(e) => {
-            println!("[DEBUG] get_all_task_views command: Error - {}", e);
-            Ok(ApiResponse {
-                success: false,
-                data: None,
-                error: Some(e.to_string()),
-            })
-        },
-    }
-}
+// TODO: TaskView commands removed during final cleanup
+// Frontend now uses Task struct directly
 
 #[tauri::command]
-pub async fn get_task_views_by_project(
+pub async fn get_all_tasks(
     state: State<'_, DbState>,
-    project_id: i64,
-) -> Result<ApiResponse<Vec<TaskView>>, String> {
-    match db_get_task_views_by_project(&state.pool, project_id).await {
-        Ok(task_views) => Ok(ApiResponse {
+) -> Result<ApiResponse<Vec<Task>>, String> {
+    match db_get_all_tasks(&state.pool).await {
+        Ok(tasks) => Ok(ApiResponse {
             success: true,
-            data: Some(task_views),
+            data: Some(tasks),
             error: None,
-        }),
-        Err(e) => Ok(ApiResponse {
-            success: false,
-            data: None,
-            error: Some(e.to_string()),
-        }),
-    }
-}
-
-#[tauri::command]
-pub async fn get_task_view_by_occurrence(
-    state: State<'_, DbState>,
-    occurrence_id: i64,
-) -> Result<ApiResponse<TaskView>, String> {
-    match db_get_task_view_by_occurrence(&state.pool, occurrence_id).await {
-        Ok(Some(task_view)) => Ok(ApiResponse {
-            success: true,
-            data: Some(task_view),
-            error: None,
-        }),
-        Ok(None) => Ok(ApiResponse {
-            success: false,
-            data: None,
-            error: Some("Task occurrence not found".to_string()),
         }),
         Err(e) => Ok(ApiResponse {
             success: false,
@@ -263,119 +204,12 @@ pub async fn update_task(
     }
 }
 
-// TaskOccurrence commands
 #[tauri::command]
-pub async fn create_task_occurrence(
-    state: State<'_, DbState>,
-    request: CreateTaskOccurrenceRequest,
-) -> Result<ApiResponse<TaskOccurrence>, String> {
-    match db_create_task_occurrence(&state.pool, request).await {
-        Ok(occurrence) => Ok(ApiResponse {
-            success: true,
-            data: Some(occurrence),
-            error: None,
-        }),
-        Err(e) => Ok(ApiResponse {
-            success: false,
-            data: None,
-            error: Some(e.to_string()),
-        }),
-    }
-}
-
-#[tauri::command]
-pub async fn get_all_task_occurrences(
-    state: State<'_, DbState>,
-) -> Result<ApiResponse<Vec<TaskOccurrence>>, String> {
-    match db_get_all_task_occurrences(&state.pool).await {
-        Ok(occurrences) => Ok(ApiResponse {
-            success: true,
-            data: Some(occurrences),
-            error: None,
-        }),
-        Err(e) => Ok(ApiResponse {
-            success: false,
-            data: None,
-            error: Some(e.to_string()),
-        }),
-    }
-}
-
-#[tauri::command]
-pub async fn get_task_occurrences_by_task(
-    state: State<'_, DbState>,
-    task_id: i64,
-) -> Result<ApiResponse<Vec<TaskOccurrence>>, String> {
-    match db_get_task_occurrences_by_task(&state.pool, task_id).await {
-        Ok(occurrences) => Ok(ApiResponse {
-            success: true,
-            data: Some(occurrences),
-            error: None,
-        }),
-        Err(e) => Ok(ApiResponse {
-            success: false,
-            data: None,
-            error: Some(e.to_string()),
-        }),
-    }
-}
-
-#[tauri::command]
-pub async fn get_task_occurrence(
-    state: State<'_, DbState>,
-    id: i64,
-) -> Result<ApiResponse<TaskOccurrence>, String> {
-    match db_get_task_occurrence_by_id(&state.pool, id).await {
-        Ok(Some(occurrence)) => Ok(ApiResponse {
-            success: true,
-            data: Some(occurrence),
-            error: None,
-        }),
-        Ok(None) => Ok(ApiResponse {
-            success: false,
-            data: None,
-            error: Some("Task occurrence not found".to_string()),
-        }),
-        Err(e) => Ok(ApiResponse {
-            success: false,
-            data: None,
-            error: Some(e.to_string()),
-        }),
-    }
-}
-
-#[tauri::command]
-pub async fn update_task_occurrence(
-    state: State<'_, DbState>,
-    request: UpdateTaskOccurrenceRequest,
-) -> Result<ApiResponse<TaskOccurrence>, String> {
-    println!("[DEBUG] Tauri update_task_occurrence command called with id={}", request.id);
-    match db_update_task_occurrence(&state.pool, request).await {
-        Ok(occurrence) => {
-            println!("[DEBUG] Tauri update_task_occurrence success");
-            Ok(ApiResponse {
-                success: true,
-                data: Some(occurrence),
-                error: None,
-            })
-        },
-        Err(e) => {
-            println!("[DEBUG] Tauri update_task_occurrence error: {}", e);
-            Ok(ApiResponse {
-                success: false,
-                data: None,
-                error: Some(e.to_string()),
-            })
-        },
-    }
-}
-
-#[tauri::command]
-pub async fn delete_task_occurrence(
+pub async fn delete_task(
     state: State<'_, DbState>,
     id: i64,
 ) -> Result<ApiResponse<()>, String> {
-    match db_delete_task_occurrence(&state.pool, id).await {
+    match db_delete_task(&state.pool, id).await {
         Ok(_) => Ok(ApiResponse {
             success: true,
             data: Some(()),
@@ -389,144 +223,11 @@ pub async fn delete_task_occurrence(
     }
 }
 
-#[tauri::command]
-pub async fn complete_task_occurrence(
-    state: State<'_, DbState>,
-    occurrence_id: i64,
-    actual_minutes: i64,
-) -> Result<ApiResponse<TaskOccurrence>, String> {
-    match db_complete_task_occurrence(&state.pool, occurrence_id, actual_minutes).await {
-        Ok(occurrence) => Ok(ApiResponse {
-            success: true,
-            data: Some(occurrence),
-            error: None,
-        }),
-        Err(e) => Ok(ApiResponse {
-            success: false,
-            data: None,
-            error: Some(e.to_string()),
-        }),
-    }
-}
+// TODO: TaskOccurrence commands removed during final cleanup
+// No longer using occurrence-based architecture
 
-// TaskReminder commands
-#[tauri::command]
-pub async fn create_task_reminder(
-    state: State<'_, DbState>,
-    request: CreateTaskReminderRequest,
-) -> Result<ApiResponse<TaskReminder>, String> {
-    match db_create_task_reminder(&state.pool, request).await {
-        Ok(reminder) => Ok(ApiResponse {
-            success: true,
-            data: Some(reminder),
-            error: None,
-        }),
-        Err(e) => Ok(ApiResponse {
-            success: false,
-            data: None,
-            error: Some(e.to_string()),
-        }),
-    }
-}
-
-#[tauri::command]
-pub async fn get_all_task_reminders(
-    state: State<'_, DbState>,
-) -> Result<ApiResponse<Vec<TaskReminder>>, String> {
-    match db_get_all_task_reminders(&state.pool).await {
-        Ok(reminders) => Ok(ApiResponse {
-            success: true,
-            data: Some(reminders),
-            error: None,
-        }),
-        Err(e) => Ok(ApiResponse {
-            success: false,
-            data: None,
-            error: Some(e.to_string()),
-        }),
-    }
-}
-
-#[tauri::command]
-pub async fn get_task_reminders_by_occurrence(
-    state: State<'_, DbState>,
-    occurrence_id: i64,
-) -> Result<ApiResponse<Vec<TaskReminder>>, String> {
-    match db_get_task_reminders_by_occurrence(&state.pool, occurrence_id).await {
-        Ok(reminders) => Ok(ApiResponse {
-            success: true,
-            data: Some(reminders),
-            error: None,
-        }),
-        Err(e) => Ok(ApiResponse {
-            success: false,
-            data: None,
-            error: Some(e.to_string()),
-        }),
-    }
-}
-
-#[tauri::command]
-pub async fn get_task_reminder(
-    state: State<'_, DbState>,
-    id: i64,
-) -> Result<ApiResponse<TaskReminder>, String> {
-    match db_get_task_reminder_by_id(&state.pool, id).await {
-        Ok(Some(reminder)) => Ok(ApiResponse {
-            success: true,
-            data: Some(reminder),
-            error: None,
-        }),
-        Ok(None) => Ok(ApiResponse {
-            success: false,
-            data: None,
-            error: Some("Task reminder not found".to_string()),
-        }),
-        Err(e) => Ok(ApiResponse {
-            success: false,
-            data: None,
-            error: Some(e.to_string()),
-        }),
-    }
-}
-
-#[tauri::command]
-pub async fn update_task_reminder(
-    state: State<'_, DbState>,
-    request: UpdateTaskReminderRequest,
-) -> Result<ApiResponse<TaskReminder>, String> {
-    match db_update_task_reminder(&state.pool, request).await {
-        Ok(reminder) => Ok(ApiResponse {
-            success: true,
-            data: Some(reminder),
-            error: None,
-        }),
-        Err(e) => Ok(ApiResponse {
-            success: false,
-            data: None,
-            error: Some(e.to_string()),
-        }),
-    }
-}
-
-#[tauri::command]
-pub async fn delete_task_reminder(
-    state: State<'_, DbState>,
-    id: i64,
-) -> Result<ApiResponse<()>, String> {
-    match db_delete_task_reminder(&state.pool, id).await {
-        Ok(_) => Ok(ApiResponse {
-            success: true,
-            data: Some(()),
-            error: None,
-        }),
-        Err(e) => Ok(ApiResponse {
-            success: false,
-            data: None,
-            error: Some(e.to_string()),
-        }),
-    }
-}
+// TODO: TaskReminder commands removed during final cleanup
+// No longer using occurrence-based reminder system
 
 // Meeting commands
 #[tauri::command]

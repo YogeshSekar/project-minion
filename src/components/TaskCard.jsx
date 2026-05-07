@@ -22,7 +22,7 @@ function TaskCard({
           onEdit(task)
         }
       }}
-      onMouseDown={(e) => onMouseDown?.(e, task.occurrence_id, { title: task.title, status: task.status })}
+      onMouseDown={(e) => onMouseDown?.(e, task.id, { title: task.title, status: task.status })}
       className={`
         bg-white rounded-2xl border border-gray-200 p-4 hover:shadow-md transition-all
         ${isDragging ? 'opacity-40 cursor-grabbing' : 'cursor-pointer'}
@@ -63,9 +63,9 @@ function TaskCard({
           <span className={`px-2 py-0.5 text-xs font-medium rounded-full border inline-flex items-center h-5 ${getTaskStatusBadge(task.status)}`}>
             {getTaskStatusLabel(task.status)}
           </span>
-          {task.occurrence_date && (
-            <span className={`text-xs ${isOverdue(task.occurrence_date) && (task.status === 'todo' || task.status === 'in_progress') ? 'text-red-500' : 'text-gray-600'}`}>
-              {formatDate(task.occurrence_date)}
+          {task.scheduled_date && (
+            <span className={`text-xs ${isOverdue(task.scheduled_date) && (task.status === 'todo' || task.status === 'in_progress') ? 'text-red-500' : 'text-gray-600'}`}>
+              {formatDate(task.scheduled_date)}
             </span>
           )}
           {task.estimated_minutes > 0 && (
@@ -83,7 +83,7 @@ function TaskCard({
         </div>
         <div className="flex items-center gap-1">
           {/* Activity Tracking Button */}
-          {runningActivity && runningActivity.reference_id === task.task_id && runningActivity.reference_type === 'task' ? (
+          {runningActivity && runningActivity.reference_id === task.id && runningActivity.reference_type === 'task' ? (
             <button
               onClick={(e) => {
                 e.stopPropagation()
@@ -125,8 +125,8 @@ function TaskCard({
             <button
               onClick={(e) => {
                 e.stopPropagation()
-                console.log('[DEBUG] TaskCard delete button clicked, passing occurrence_id:', task.occurrence_id)
-                onDelete(task.occurrence_id)
+                console.log('[DEBUG] TaskCard delete button clicked, passing task.id:', task.id)
+                onDelete(task.id)
               }}
               className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
               title="Delete"
