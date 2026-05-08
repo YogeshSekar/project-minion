@@ -146,7 +146,7 @@ function QuickAddTask({ onCreateTask, isExpanded, setIsExpanded }) {
         ref={containerRef}
         className="fixed bottom-24 right-6 z-50 animate-in slide-in-from-bottom-2 fade-in duration-200"
       >
-        <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-4 w-[560px]">
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-4 w-[640px]">
           {/* Header */}
           <div className="flex items-center justify-between mb-3">
             <span className="text-sm font-medium text-gray-700">Quick Add Task</span>
@@ -158,73 +158,8 @@ function QuickAddTask({ onCreateTask, isExpanded, setIsExpanded }) {
             )}
           </div>
 
-          {/* Form Row */}
-          <div className="flex items-center gap-2">
-            {/* Project Selector */}
-            <div className="relative" ref={dropdownRef.ref}>
-              <button
-                onClick={() => dropdownRef.setIsOpen(!dropdownRef.isOpen)}
-                className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-full hover:bg-gray-100 transition-colors text-sm min-w-[120px] max-w-[160px]"
-              >
-                <span className="truncate text-gray-700">
-                  {getSelectedProject()?.title || 'No Project'}
-                </span>
-              </button>
-              {dropdownRef.isOpen && (
-                <div className="absolute bottom-full left-0 mb-1 w-48 bg-white rounded-xl shadow-lg border border-gray-200 z-50 max-h-60 overflow-y-auto">
-                  <button
-                    onClick={() => {
-                      setProjectId(null)
-                      dropdownRef.setIsOpen(false)
-                    }}
-                    className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 ${!projectId ? 'bg-gray-100 text-gray-900' : ''}`}
-                  >
-                    No Project
-                  </button>
-                  {projects.map(project => (
-                    <button
-                      key={project.id}
-                      onClick={() => {
-                        setProjectId(project.id)
-                        dropdownRef.setIsOpen(false)
-                      }}
-                      className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 truncate ${projectId === project.id ? 'bg-gray-100 text-gray-900' : ''}`}
-                    >
-                      {project.title}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Priority Selector */}
-            <div className="relative" ref={priorityDropdownRef.ref}>
-              <button
-                onClick={() => priorityDropdownRef.setIsOpen(!priorityDropdownRef.isOpen)}
-                className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-gray-200 rounded-full hover:bg-gray-100 transition-colors text-sm"
-              >
-                <div className={`w-2 h-2 rounded-full ${priorityColors[priority]}`} />
-                <span className="capitalize text-gray-700">{priority}</span>
-              </button>
-              {priorityDropdownRef.isOpen && (
-                <div className="absolute bottom-full left-0 mb-1 w-32 bg-white rounded-xl shadow-lg border border-gray-200 z-50">
-                  {['high', 'medium', 'low'].map(p => (
-                    <button
-                      key={p}
-                      onClick={() => {
-                        setPriority(p)
-                        priorityDropdownRef.setIsOpen(false)
-                      }}
-                      className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 flex items-center gap-2 ${priority === p ? 'bg-gray-100' : ''}`}
-                    >
-                      <div className={`w-2 h-2 rounded-full ${priorityColors[p]}`} />
-                      <span className="capitalize">{p}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
+          {/* First Row - Task Input and Send Button */}
+          <div className="flex items-center gap-2 mb-3">
             {/* Task Input */}
             <input
               ref={inputRef}
@@ -248,6 +183,71 @@ function QuickAddTask({ onCreateTask, isExpanded, setIsExpanded }) {
                 <Send className="w-4 h-4" />
               )}
             </button>
+          </div>
+
+          {/* Second Row - Project and Priority Selection */}
+          <div className="flex items-center gap-2">
+            {/* Project Selector */}
+            <div className="relative dropdown-container">
+              <button
+                onClick={() => dropdownRef.setIsOpen(!dropdownRef.isOpen)}
+                className="flex items-center gap-2 px-3 py-1 rounded-2xl bg-gray-100 text-gray-600 text-sm font-medium hover:bg-gray-200 transition-colors"
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-gray-900"></span>
+                {getSelectedProject() ? getSelectedProject().title : 'No Project'}
+              </button>
+              {dropdownRef.isOpen && (
+                <div className="absolute bottom-full left-0 mb-1 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 py-2 min-w-[200px] overflow-hidden">
+                  <button
+                    onClick={() => {
+                      setProjectId(null)
+                      dropdownRef.setIsOpen(false)
+                    }}
+                    className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 ${
+                      !projectId ? 'bg-gray-200 text-gray-900' : 'text-gray-700'
+                    }`}
+                  >
+                    No Project
+                  </button>
+                  {projects.map(project => (
+                    <button
+                      key={project.id}
+                      onClick={() => {
+                        setProjectId(project.id)
+                        dropdownRef.setIsOpen(false)
+                      }}
+                      className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 ${
+                        projectId === project.id ? 'bg-gray-200 text-gray-900' : 'text-gray-700'
+                      }`}
+                    >
+                      {project.title}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Priority Buttons */}
+            <div className="flex items-center gap-2">
+              {[
+                { value: 'high', label: 'High', color: 'bg-red-500', bgColor: 'bg-red-50 text-red-600', borderColor: 'border-red-500' },
+                { value: 'medium', label: 'Medium', color: 'bg-yellow-500', bgColor: 'bg-yellow-50 text-yellow-600', borderColor: 'border-yellow-500' },
+                { value: 'low', label: 'Low', color: 'bg-green-500', bgColor: 'bg-green-50 text-green-600', borderColor: 'border-green-500' }
+              ].map((p) => (
+                <button
+                  key={p.value}
+                  onClick={() => setPriority(p.value)}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium transition-colors border ${
+                    priority === p.value
+                      ? `${p.bgColor} ${p.borderColor}`
+                      : 'bg-gray-100 text-gray-500 border-transparent hover:bg-gray-200'
+                  }`}
+                >
+                  <span className={`w-1.5 h-1.5 rounded-full ${p.color}`}></span>
+                  {p.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Hint */}

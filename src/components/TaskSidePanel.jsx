@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { X, ChevronDown, Hash, Calendar, Clock, Paperclip, Star, MoreVertical, Loader2, Check, FolderOpen } from 'lucide-react'
 import DateTimePicker from './DateTimePicker'
 
@@ -53,6 +53,17 @@ function TaskSidePanel({
   const [showScheduledDatePicker, setShowScheduledDatePicker] = useState(false)
   const [showRecurrenceEndDatePicker, setShowRecurrenceEndDatePicker] = useState(false)
   const [showStatusDropdown, setShowStatusDropdown] = useState(false)
+  const titleInputRef = useRef(null)
+
+  // Focus title input when panel opens
+  useEffect(() => {
+    if (isOpen && titleInputRef.current) {
+      titleInputRef.current.focus()
+      // Place cursor at the end
+      const length = titleInputRef.current.value.length
+      titleInputRef.current.setSelectionRange(length, length)
+    }
+  }, [isOpen])
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -87,19 +98,14 @@ function TaskSidePanel({
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    console.log('[DEBUG] TaskSidePanel handleSubmit triggered, mode:', mode)
     if (!validateForm()) {
-      console.log('[DEBUG] TaskSidePanel validation failed')
       return
     }
-    console.log('[DEBUG] TaskSidePanel validation passed, formData:', formData)
 
     setIsLoading(true)
     try {
       if (mode === 'create') {
-        console.log('[DEBUG] TaskSidePanel creating task with payload:', formData)
         const response = await onCreateTask(formData)
-        console.log('[DEBUG] TaskSidePanel create response:', response)
         if (response.success) {
           onSave(response.data)
           onClose()
@@ -107,7 +113,6 @@ function TaskSidePanel({
           setErrors({ submit: response.error })
         }
       } else {
-        console.log('[DEBUG] TaskSidePanel editing task, original task:', task)
         // TODO: Occurrence split logic removed during frontend simplification
         // Now using single-task CRUD architecture
         const taskPayload = {
@@ -120,14 +125,9 @@ function TaskSidePanel({
           scheduled_date: formData.scheduled_date || null,
           project_id: formData.project_id || null
         }
-        console.log('[DEBUG] TaskSidePanel task payload:', taskPayload)
-
         // Update task
-        console.log('[DEBUG] TaskSidePanel calling onUpdateTask')
         const response = await onUpdateTask(taskPayload)
-        console.log('[DEBUG] TaskSidePanel response:', response)
         if (!response.success) {
-          console.log('[DEBUG] TaskSidePanel update failed')
           setErrors({ submit: response.error })
           setIsLoading(false)
           return
@@ -136,16 +136,13 @@ function TaskSidePanel({
         // TODO: Occurrence update logic removed during frontend simplification
         // Now using single-task CRUD architecture
         if (response.success) {
-          console.log('[DEBUG] TaskSidePanel save successful, calling onSave')
           onSave(response.data)
           onClose()
         } else {
-          console.log('[DEBUG] TaskSidePanel update failed')
           setErrors({ submit: response.error })
         }
       }
     } catch (error) {
-      console.log('[DEBUG] TaskSidePanel handleSubmit error:', error)
       setErrors({ submit: error.toString() })
     } finally {
       setIsLoading(false)
@@ -213,12 +210,12 @@ function TaskSidePanel({
     <>
       {/* Backdrop */}
       <div 
-        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 transition-opacity"
+        className="fixed inset-0 bg-black/40 z-[55] transition-opacity"
         onClick={onClose}
       />
       
       {/* Side Panel - Floating with rounded corners */}
-      <div className="fixed right-4 top-4 bottom-4 w-[520px] bg-white shadow-2xl z-50 flex flex-col border border-gray-200 rounded-2xl overflow-hidden animate-slide-in-right">
+      <div className="fixed right-4 top-4 bottom-4 w-[520px] bg-white shadow-2xl z-[60] flex flex-col border border-gray-200 rounded-2xl overflow-hidden animate-slide-in-right">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
           <button
@@ -245,6 +242,7 @@ function TaskSidePanel({
           {/* Task Title */}
           <div className="px-6 py-5">
             <input
+              ref={titleInputRef}
               type="text"
               value={formData.title}
               onChange={(e) => handleChange('title', e.target.value)}
@@ -404,7 +402,6 @@ function TaskSidePanel({
                     <DateTimePicker
                       value={formData.due_date}
                       onChange={(date) => {
-                        console.log('[DEBUG] Due date changed to:', date)
                         handleChange('due_date', date)
                         setShowDueDatePicker(false)
                       }}
@@ -434,7 +431,6 @@ function TaskSidePanel({
                     <DateTimePicker
                       value={formData.scheduled_date}
                       onChange={(date) => {
-                        console.log('[DEBUG] Scheduled date changed to:', date)
                         handleChange('scheduled_date', date)
                         setShowScheduledDatePicker(false)
                       }}
@@ -577,72 +573,6 @@ function TaskSidePanel({
               />
             </div>
           </div>
-
-          {/* Tabs */}
-          <div className="flex border-b border-gray-200 mt-6 px-6">
-            {['Activity', 'Comments'].map((tab, index) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab.toLowerCase())}
-                className={`px-4 py-3 text-sm font-medium transition-colors ${
-                  activeTab === tab.toLowerCase()
-                    ? 'text-gray-900 border-b-2 border-gray-900'
-                    : 'text-gray-500 hover:text-gray-700'
-                } ${index === 0 ? 'pl-0' : ''}`}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
-
-          {/* Tab Content */}
-          <div className="px-6 py-4">
-            {activeTab === 'activity' && (
-              <div className="space-y-4">
-                <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  Today
-                </h4>
-                
-                {/* Activity Item */}
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-full bg-gray-900 flex items-center justify-center text-white text-xs font-medium flex-shrink-0">
-                    T
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm text-gray-700 leading-relaxed">
-                      <span className="font-medium text-gray-900">Talan Korsgaard</span> changed the status of "{formData.title || 'Task'}" from <span className="text-gray-500">To Do</span> to <span className="text-gray-900">In Progress</span>
-                    </p>
-                    <p className="text-xs text-gray-400 mt-1">10:45 AM</p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'comments' && (
-              <div className="space-y-4">
-                {/* Comment Input */}
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-full bg-gray-900 flex items-center justify-center text-white text-xs font-medium flex-shrink-0">
-                    U
-                  </div>
-                  <div className="flex-1 relative">
-                    <input
-                      type="text"
-                      placeholder="Write a comment..."
-                      className="w-full px-3 py-2 pr-10 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 text-gray-900"
-                    />
-                    <button className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-900">
-                      <Paperclip className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                <p className="text-sm text-gray-400 text-center py-8">
-                  No comments yet
-                </p>
-              </div>
-            )}
-          </div>
         </div>
 
         {/* Save Button - Floating */}
@@ -650,7 +580,7 @@ function TaskSidePanel({
           <button
             onClick={handleSubmit}
             disabled={isLoading}
-            className="px-6 py-2.5 text-sm font-medium text-white bg-gray-900 hover:bg-gray-700 rounded-2xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-2xl"
+            className="flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-full border border-gray-900 hover:bg-gray-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? 'Saving...' : mode === 'create' ? 'Create Task' : 'Save Changes'}
           </button>
