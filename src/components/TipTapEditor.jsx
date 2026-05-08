@@ -466,13 +466,29 @@ function TipTapEditor({ content, onChange, editable = true, moveCursorToEnd = fa
       >
         <EditorContent
           editor={editor}
-          className="prose prose-sm dark:prose-invert max-w-none p-4 focus:outline-none min-h-[200px] h-full
-            prose-p:my-1 prose-headings:my-2 prose-ul:my-1 prose-ol:my-1
-            prose-blockquote:border-l-4 prose-blockquote:border-gray-300 prose-blockquote:pl-4 prose-blockquote:italic
-            prose-code:bg-gray-100 prose-code:dark:bg-gray-800 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-sm
-            prose-pre:bg-gray-100 prose-pre:dark:bg-gray-800 prose-pre:p-3 prose-pre:rounded-lg
-            prose-img:max-w-full prose-img:rounded-lg
-            [&_.ProseMirror]:min-h-[200px] [&_.ProseMirror]:h-full [&_.ProseMirror]:outline-none
+          className="prose prose-sm dark:prose-invert max-w-none p-6 focus:outline-none min-h-[200px] h-full
+            prose-p:my-3 prose-p:leading-relaxed prose-p:text-gray-800 prose-p:dark:text-gray-200
+            prose-headings:my-4 prose-headings:font-semibold prose-headings:text-gray-900 prose-headings:dark:text-gray-100 prose-headings:tracking-tight
+            prose-h1:text-3xl prose-h1:font-bold prose-h1:mb-4 prose-h1:pb-2 prose-h1:border-b prose-h1:border-gray-200
+            prose-h2:text-2xl prose-h2:font-semibold prose-h2:mb-3 prose-h2:pb-2 prose-h2:border-b prose-h2:border-gray-200
+            prose-h3:text-xl prose-h3:font-semibold prose-h3:mb-2 prose-h3:pb-1 prose-h3:border-b prose-h3:border-gray-200
+            prose-ul:my-3 prose-ul:list-disc prose-ul:space-y-2 prose-ul:text-gray-800 prose-ul:dark:text-gray-200
+            prose-ol:my-3 prose-ol:list-decimal prose-ol:space-y-2 prose-ol:text-gray-800 prose-ol:dark:text-gray-200
+            prose-li:my-1 prose-li:leading-relaxed prose-li:text-gray-800 prose-li:dark:text-gray-200
+            prose-blockquote:border-l-4 prose-blockquote:border-gray-300 prose-blockquote:pl-6 prose-blockquote:italic prose-blockquote:bg-gray-50 prose-blockquote:py-4 prose-blockquote:rounded-r-lg prose-blockquote:not-italic
+            prose-blockquote:text-gray-700 prose-blockquote:dark:text-gray-300
+            prose-code:bg-gray-100 prose-code:dark:bg-gray-800 prose-code:px-2 prose-code:py-1 prose-code:rounded prose-code:text-sm prose-code:font-mono prose-code:text-gray-800 prose-code:dark:text-gray-200
+            prose-pre:bg-gray-100 prose-pre:dark:bg-gray-800 prose-pre:p-4 prose-pre:rounded-lg prose-pre:text-sm prose-pre:font-mono prose-pre:leading-relaxed
+            prose-img:max-w-full prose-img:rounded-lg prose-img:shadow-md
+            prose-hr:my-6 prose-hr:border-t prose-hr:border-gray-200 prose-hr:dark:border-gray-700
+            prose-strong:font-semibold prose-strong:text-gray-900 prose-strong:dark:text-gray-100
+            prose-em:italic prose-em:text-gray-700 prose-em:dark:text-gray-300
+            [&_.ProseMirror]:min-h-[200px] [&_.ProseMirror]:h-full [&_.ProseMirror]:outline-none [&_.ProseMirror]:text-gray-800 [&_.ProseMirror]:dark:text-gray-200
+            [&_.ProseMirror]:leading-relaxed [&_.ProseMirror]:font-sans
+            [&_.ProseMirror_p]:my-3 [&_.ProseMirror_p]:leading-relaxed
+            [&_.ProseMirror_h1]:text-3xl [&_.ProseMirror_h1]:font-bold [&_.ProseMirror_h1]:mb-4 [&_.ProseMirror_h1]:pb-2 [&_.ProseMirror_h1]:border-b [&_.ProseMirror_h1]:border-gray-200
+            [&_.ProseMirror_h2]:text-2xl [&_.ProseMirror_h2]:font-semibold [&_.ProseMirror_h2]:mb-3 [&_.ProseMirror_h2]:pb-2 [&_.ProseMirror_h2]:border-b [&_.ProseMirror_h2]:border-gray-200
+            [&_.ProseMirror_h3]:text-xl [&_.ProseMirror_h3]:font-semibold [&_.ProseMirror_h3]:mb-2 [&_.ProseMirror_h3]:pb-1 [&_.ProseMirror_h3]:border-b [&_.ProseMirror_h3]:border-gray-200
             [&_.resizable-image-container]:relative [&_.resizable-image-container]:inline-block
             [&_.resize-handle]:absolute [&_.resize-handle]:w-3 [&_.resize-handle]:h-3 [&_.resize-handle]:bg-white [&_.resize-handle]:border-2 [&_.resize-handle]:border-blue-500 [&_.resize-handle]:rounded [&_.resize-handle]:opacity-0 [&_.resize-handle]:hover:opacity-100 [&_.resize-handle]:transition-opacity [&_.resize-handle]:z-10
             [&_.resize-handle-se]:bottom-[-6px] [&_.resize-handle-se]:right-[-6px] [&_.resize-handle-se]:cursor-se-resize

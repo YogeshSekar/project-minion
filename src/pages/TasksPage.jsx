@@ -25,13 +25,6 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
   const { tasks, loading: tasksLoading, updateTask, deleteTask, loadTasks } = useTasks()
   const { projects, loading: projectsLoading } = useProjects()
 
-  // DEBUG: Log tasks state when it changes
-  useEffect(() => {
-    console.log('[DEBUG] TasksPage tasks state updated:', tasks.length, 'tasks')
-    tasks.forEach((task, i) => {
-      console.log(`[DEBUG] TasksPage tasks[${i}] id=${task.id}, title="${task.title}", status="${task.status}"`)
-    })
-  }, [tasks])
 
   // Use click-outside hooks for dropdowns
   const filterDropdown = useClickOutside()
@@ -139,7 +132,6 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
   }
 
   const handleDeleteTask = async (taskId) => {
-    console.log('[DEBUG] TasksPage handleDeleteTask called with taskId:', taskId)
     showConfirm({
       title: 'Delete Task',
       message: 'Are you sure you want to delete this task? This action cannot be undone.',
@@ -147,11 +139,8 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
       cancelText: 'Cancel',
       type: 'danger',
       onConfirm: async () => {
-        console.log('[DEBUG] TasksPage delete confirmed, calling deleteTask with:', taskId)
         const response = await deleteTask(taskId)
-        console.log('[DEBUG] TasksPage deleteTask response:', response)
         if (!response.success) {
-          console.log('[DEBUG] TasksPage delete failed:', response.error)
           alert('Failed to delete task: ' + (response.error || 'Unknown error'))
         }
       },
@@ -273,15 +262,6 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
   const pendingTasks = allTasks.filter(t => t.status === 'todo')
   const inProgressTasks = allTasks.filter(t => t.status === 'in_progress')
 
-  // DEBUG: Log filtered tasks
-  useEffect(() => {
-    console.log('[DEBUG] TasksPage allTasks (filtered):', allTasks.length, 'tasks')
-    allTasks.forEach((task, i) => {
-      console.log(`[DEBUG] TasksPage allTasks[${i}] id=${task.id}, title="${task.title}", status="${task.status}"`)
-    })
-    console.log('[DEBUG] TasksPage pendingTasks:', pendingTasks.length, 'tasks')
-    console.log('[DEBUG] TasksPage inProgressTasks:', inProgressTasks.length, 'tasks')
-  }, [allTasks, pendingTasks, inProgressTasks])
   const completedTasks = allTasks.filter(t => t.status === 'completed')
   
   // Group completed tasks for recurring tasks
@@ -539,9 +519,9 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
       <div className="flex-1 flex flex-col relative">
         {viewMode === 'list' ? (
           /* Table Layout */
-          <div className="h-full flex justify-center p-4">
+          <div className="h-full flex flex-col">
             {/* Task List - Table View */}
-            <div className="w-full max-w-6xl h-full flex flex-col">
+            <div className="w-full h-full flex flex-col">
               {/* Merged Container: Status Filter + Task List */}
               <div className="flex-1 flex flex-col h-full overflow-hidden">
                 {/* Single Card with Status Filter + Task List */}
@@ -597,9 +577,8 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
 
                   {/* Active Tasks List - Scrollable */}
                   <div className="flex-1 overflow-auto no-scrollbar p-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-max">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 auto-rows-max">
                       {visibleTasks.map(task => {
-                        console.log(`[DEBUG] Rendering TaskCard with key=${task.id}, title="${task.title}"`)
                         return (
                           <TaskCard
                             key={task.id}
@@ -624,7 +603,7 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
                           <span className="w-1.5 h-1.5 rounded-full bg-gray-900"></span>
                           Recurring Completed
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 auto-rows-max">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 auto-rows-max">
                           {groupedRecurring.map(group => (
                             <GroupedCompletedTaskCard
                               key={group.task_id}

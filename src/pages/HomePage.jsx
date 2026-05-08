@@ -347,7 +347,7 @@ function HomePage({ openTaskModal, taskRefreshTrigger = 0, onActivityStarted, on
         {/* Right Main Content */}
         <div className="flex-1 flex flex-col overflow-hidden">
           {/* Main Content - Quick Notes and Timeline */}
-          <div className="flex-1 overflow-auto p-4">
+          <div className="flex-1 overflow-auto">
             {/* Quick Notes Section */}
             <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-4">
               <div className="flex items-center justify-between mb-4">
