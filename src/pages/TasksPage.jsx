@@ -192,7 +192,10 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
       priority: task.priority,
       due_date: task.due_date,
       scheduled_date: task.scheduled_date,
-      project_id: task.project_id
+      project_id: task.project_id,
+      is_recurring: task.is_recurring,
+      recurrence_type: task.recurrence_type,
+      recurrence_interval: task.recurrence_interval
     })
     if (!response.success) {
       console.error('Error toggling task completion:', response.error)

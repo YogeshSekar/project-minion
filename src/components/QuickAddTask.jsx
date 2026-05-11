@@ -73,11 +73,9 @@ function QuickAddTask({ onCreateTask, isExpanded, setIsExpanded }) {
       status: 'todo',
       project_id: projectId,
       scheduled_date: new Date().toISOString().split('T')[0],
-      parent_task_id: null,
-      estimated_minutes: 0,
       is_recurring: 0,
-      recurrence_rule: null,
-      recurrence_end_date: null
+      recurrence_type: null,
+      recurrence_interval: 1,
     }
     
     const response = await onCreateTask(payload)

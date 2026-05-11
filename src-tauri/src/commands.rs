@@ -1,38 +1,58 @@
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
-use crate::database::{
+// Import models from the new modular structure
+use crate::database::models::{
+    CreateProjectRequest, Project, UpdateProjectRequest,
+    CreateTaskRequest, Task, UpdateTaskRequest,
+    CreateMeetingRequest, Meeting, UpdateMeetingRequest, UpdateMeetingUrlRequest,
+    CreateNoteRequest, Note, UpdateNoteRequest,
+    CreateActivityRequest, Activity, UpdateActivityRequest,
+    CreateHabitRequest, Habit, UpdateHabitRequest,
+    CreateHabitLogRequest, HabitLog, UpdateHabitLogRequest,
+    CreateTaskCompletionLogRequest, TaskCompletionLog, UpdateTaskCompletionLogRequest,
+};
+
+// Import repository functions from the new modular structure
+use crate::database::repositories::{
     create_project as db_create_project, delete_project as db_delete_project,
     get_all_projects as db_get_all_projects, get_project_by_id as db_get_project_by_id,
-    update_project as db_update_project, CreateProjectRequest, Project, UpdateProjectRequest,
+    update_project as db_update_project,
     create_task as db_create_task,
-    update_task as db_update_task, delete_task as db_delete_task, get_all_tasks as db_get_all_tasks, CreateTaskRequest, Task, UpdateTaskRequest,
-    // TODO: TaskView and occurrence-related imports removed during final cleanup
-    // Frontend now uses Task struct directly
+    update_task as db_update_task, delete_task as db_delete_task, get_all_tasks as db_get_all_tasks,
     create_meeting as db_create_meeting, delete_meeting as db_delete_meeting,
     get_all_meetings as db_get_all_meetings, get_meeting_by_id as db_get_meeting_by_id,
     get_meetings_by_date as db_get_meetings_by_date,
     get_meeting_by_outlook_id as db_get_meeting_by_outlook_id,
     update_meeting as db_update_meeting, update_meeting_url as db_update_meeting_url,
-    CreateMeetingRequest, Meeting, UpdateMeetingRequest, UpdateMeetingUrlRequest,
     create_note as db_create_note, delete_note as db_delete_note,
     get_all_notes as db_get_all_notes, get_note_by_id as db_get_note_by_id,
     get_notes_by_project as db_get_notes_by_project,
-    update_note as db_update_note, CreateNoteRequest, Note, UpdateNoteRequest,
+    update_note as db_update_note,
     create_activity as db_create_activity, delete_activity as db_delete_activity,
     get_activities as db_get_activities, get_activity_by_id as db_get_activity_by_id,
     get_activities_by_reference as db_get_activities_by_reference,
     get_running_activity as db_get_running_activity,
-    update_activity as db_update_activity, Activity, CreateActivityRequest, UpdateActivityRequest,
+    update_activity as db_update_activity,
     create_habit as db_create_habit, delete_habit as db_delete_habit,
     get_all_habits as db_get_all_habits,
-    get_habit_with_stats as db_get_habit_with_stats,
-    update_habit as db_update_habit, CreateHabitRequest, Habit, UpdateHabitRequest,
+    update_habit as db_update_habit,
     create_habit_log as db_create_habit_log,
     get_habit_logs_by_habit as db_get_habit_logs_by_habit,
     get_habit_log_by_date as db_get_habit_log_by_date,
-    update_habit_log as db_update_habit_log, HabitLog, CreateHabitLogRequest, UpdateHabitLogRequest,
+    update_habit_log as db_update_habit_log,
+    create_task_completion_log as db_create_task_completion_log,
+    update_task_completion_log as db_update_task_completion_log,
+    get_task_completion_logs_by_task as db_get_task_completion_logs_by_task,
+    get_task_completion_log_by_id as db_get_task_completion_log_by_id,
+    delete_task_completion_log as db_delete_task_completion_log,
+    mark_completion_log_undone as db_mark_completion_log_undone,
+    get_completion_logs_by_date_range as db_get_completion_logs_by_date_range,
 };
+
+// Import habit stats function from habit repository
+use crate::database::repositories::get_habit_with_stats as db_get_habit_with_stats;
+use crate::services::recurrence_service::complete_recurring_task;
 
 pub struct DbState {
     pub pool: sqlx::Pool<sqlx::Sqlite>,
@@ -190,17 +210,107 @@ pub async fn update_task(
     state: State<'_, DbState>,
     request: UpdateTaskRequest,
 ) -> Result<ApiResponse<Task>, String> {
-    match db_update_task(&state.pool, request).await {
-        Ok(task) => Ok(ApiResponse {
-            success: true,
-            data: Some(task),
-            error: None,
-        }),
-        Err(e) => Ok(ApiResponse {
-            success: false,
-            data: None,
-            error: Some(e.to_string()),
-        }),
+    // First, fetch current task from database to get accurate recurring state
+    let current_task = match db_get_all_tasks(&state.pool).await {
+        Ok(tasks) => {
+            if let Some(task) = tasks.iter().find(|t| t.id == request.id) {
+                Some(task.clone())
+            } else {
+                return Ok(ApiResponse {
+                    success: false,
+                    data: None,
+                    error: Some("Task not found".to_string()),
+                });
+            }
+        }
+        Err(e) => {
+            return Ok(ApiResponse {
+                success: false,
+                data: None,
+                error: Some(format!("Failed to fetch current task: {}", e)),
+            });
+        }
+    };
+
+    // Use CURRENT DATABASE TASK STATE for recurring detection
+    let is_recurring_completion = current_task.as_ref()
+        .map(|task| {
+            task.is_recurring == 1 
+                && task.recurrence_type.is_some()
+                && request.status == "completed"
+        })
+        .unwrap_or(false);
+
+    // Minimal debug logs
+    if let Some(ref task) = current_task {
+        println!("DEBUG: task_id: {}, DB is_recurring: {}, request.status: {}, routing: {}", 
+                 task.id, task.is_recurring, request.status, 
+                 if is_recurring_completion { "RECURRING" } else { "NORMAL" });
+    }
+
+    if is_recurring_completion {
+        // For recurring tasks, use the fetched current task and recurrence service
+        if let Some(ref task) = current_task {
+            // Add debug log
+            println!("DEBUG: recurring task completion - task_id: {}, title: {}", task.id, task.title);
+            
+            match complete_recurring_task(&state.pool, task).await {
+                Ok(_completion_log) => {
+                    // Return updated task after recurrence processing
+                    match db_get_all_tasks(&state.pool).await {
+                        Ok(updated_tasks) => {
+                            if let Some(updated_task) = updated_tasks.iter().find(|t| t.id == request.id) {
+                                println!("DEBUG: Recurrence metadata after update - is_recurring: {}, new scheduled_date: {:?}", 
+                                         updated_task.is_recurring, updated_task.scheduled_date);
+                                Ok(ApiResponse {
+                                    success: true,
+                                    data: Some(updated_task.clone()),
+                                    error: None,
+                                })
+                            } else {
+                                Ok(ApiResponse {
+                                    success: false,
+                                    data: None,
+                                    error: Some("Failed to retrieve updated task after recurrence processing".to_string()),
+                                })
+                            }
+                        }
+                        Err(e) => Ok(ApiResponse {
+                            success: false,
+                            data: None,
+                            error: Some(format!("Failed to retrieve updated task: {}", e)),
+                        })
+                    }
+                }
+                Err(e) => Ok(ApiResponse {
+                    success: false,
+                    data: None,
+                    error: Some(format!("Recurring task completion failed: {}", e)),
+                })
+            }
+        } else {
+            Ok(ApiResponse {
+                success: false,
+                data: None,
+                error: Some("Task not found for recurrence processing".to_string()),
+            })
+        }
+    } else {
+        // For normal tasks, use existing logic
+        println!("DEBUG: NORMAL PATH - task_id: {}, status: {}, is_recurring: {:?}", request.id, request.status, request.is_recurring);
+        
+        match db_update_task(&state.pool, request).await {
+            Ok(task) => Ok(ApiResponse {
+                success: true,
+                data: Some(task),
+                error: None,
+            }),
+            Err(e) => Ok(ApiResponse {
+                success: false,
+                data: None,
+                error: Some(e.to_string()),
+            }),
+        }
     }
 }
 
@@ -819,3 +929,4 @@ pub async fn get_habit_logs(
         }),
     }
 }
+

@@ -43,7 +43,15 @@ function TaskCard({
           {task.title}
         </h3>
         {task.is_recurring === 1 && (
-          <RotateCcw className="w-3 h-3 text-blue-500" title="Recurring task" />
+          <div className="flex items-center gap-1 text-xs text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">
+            <RotateCcw className="w-3 h-3" />
+            <span>
+              {task.recurrence_type === 'daily' ? `Every ${task.recurrence_interval || 1} day${(task.recurrence_interval || 1) > 1 ? 's' : ''}` :
+               task.recurrence_type === 'weekly' ? `Every ${task.recurrence_interval || 1} week${(task.recurrence_interval || 1) > 1 ? 's' : ''}` :
+               task.recurrence_type === 'monthly' ? `Every ${task.recurrence_interval || 1} month${(task.recurrence_interval || 1) > 1 ? 's' : ''}` :
+               'Recurring'}
+            </span>
+          </div>
         )}
       </div>
       <div className="flex items-center gap-2 flex-wrap justify-between">

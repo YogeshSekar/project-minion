@@ -15,6 +15,7 @@ use tauri::Manager;
 mod commands;
 mod database;
 mod outlook;
+mod services;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -39,12 +40,6 @@ pub fn run() {
             get_all_tasks,
             update_task,
             delete_task,
-            // TODO: TaskView commands removed during final cleanup
-            // Frontend now uses Task struct directly
-            // TODO: TaskOccurrence commands removed during final cleanup
-            // No longer using occurrence-based architecture
-            // TODO: TaskReminder commands removed during final cleanup
-            // No longer using occurrence-based reminder system
             create_meeting,
             get_all_meetings,
             get_meetings_by_date,
