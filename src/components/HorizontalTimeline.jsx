@@ -56,30 +56,47 @@ function HorizontalTimeline({ selectedDate, tasks, onTaskClick }) {
   // Generate timeline data
   const generateTimelineData = () => {
     const timeline = []
+    
+    console.log('[DEBUG] HorizontalTimeline generateTimelineData called')
+    console.log('[DEBUG] Total tasks received:', tasks.length)
+    console.log('[DEBUG] Selected date:', selectedDate.toDateString())
+    console.log('[DEBUG] Tasks with scheduled_date:', tasks.filter(t => t.scheduled_date).length)
 
     tasks.forEach(task => {
-      if (task.occurrence_date) {
-        const taskDate = new Date(task.occurrence_date)
+      // Show tasks if they have a scheduled_date matching the selected date
+      // OR if they don't have a scheduled_date (show them for today)
+      let shouldShow = false
+      
+      if (task.scheduled_date) {
+        const taskDate = new Date(task.scheduled_date)
         const selectedDateOnly = new Date(selectedDate)
         selectedDateOnly.setHours(0, 0, 0, 0)
         taskDate.setHours(0, 0, 0, 0)
+        shouldShow = taskDate.getTime() === selectedDateOnly.getTime()
+      } else {
+        // Tasks without scheduled_date show up for today
+        const today = new Date()
+        const selectedDateOnly = new Date(selectedDate)
+        selectedDateOnly.setHours(0, 0, 0, 0)
+        today.setHours(0, 0, 0, 0)
+        shouldShow = today.getTime() === selectedDateOnly.getTime()
+      }
 
-        if (taskDate.getTime() === selectedDateOnly.getTime()) {
-          let estimatedTime = '9:00 AM'
-          if (task.priority === 'high') estimatedTime = '10:00 AM'
-          else if (task.priority === 'medium') estimatedTime = '2:00 PM'
-          else estimatedTime = '3:00 PM'
+      if (shouldShow) {
+        let estimatedTime = '9:00 AM'
+        if (task.priority === 'high') estimatedTime = '10:00 AM'
+        else if (task.priority === 'medium') estimatedTime = '2:00 PM'
+        else estimatedTime = '3:00 PM'
 
-          timeline.push({
-            id: `task-${task.occurrence_id}`,
-            type: 'task',
-            time: estimatedTime,
-            title: task.title.length > 50 ? task.title.substring(0, 50) + '...' : task.title,
-            priority: task.priority,
-            status: task.status,
-            duration: getTaskDuration(task)
-          })
-        }
+        timeline.push({
+          id: `task-${task.id}`,
+          type: 'task',
+          time: estimatedTime,
+          title: task.title.length > 50 ? task.title.substring(0, 50) + '...' : task.title,
+          priority: task.priority,
+          status: task.status,
+          duration: getTaskDuration(task)
+        })
       }
     })
     
@@ -119,6 +136,9 @@ function HorizontalTimeline({ selectedDate, tasks, onTaskClick }) {
         duration: duration
       })
     })
+    
+    console.log('[DEBUG] Final timeline data:', timeline)
+    console.log('[DEBUG] Timeline tasks count:', timeline.filter(item => item.type === 'task').length)
     
     return timeline.sort((a, b) => {
       const timeA = new Date(`2024-01-01 ${a.time}`)
@@ -406,7 +426,7 @@ function HorizontalTimeline({ selectedDate, tasks, onTaskClick }) {
                   onClick={() => {
                     if (item.type === 'task' && onTaskClick) {
                       const taskId = item.id.replace('task-', '')
-                      const task = tasks.find(t => String(t.occurrence_id) === taskId)
+                      const task = tasks.find(t => String(t.id) === taskId)
                       if (task) onTaskClick(task)
                     }
                   }}

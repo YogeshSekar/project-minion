@@ -160,7 +160,7 @@ function BoardColumn({ title, columnId, tasks, projects, isDropTarget, onMouseEn
         ) : (
           tasks.map(task => (
             <TaskCard
-              key={task.occurrence_id}
+              key={task.id}
               task={task}
               projects={projects}
               onToggleComplete={onComplete}
@@ -168,7 +168,7 @@ function BoardColumn({ title, columnId, tasks, projects, isDropTarget, onMouseEn
               onDelete={onDelete}
               onAddToToday={onAddToToday}
               onMouseDown={onTaskMouseDown}
-              isDragging={draggingId === task.occurrence_id}
+              isDragging={draggingId === task.id}
             />
           ))
         )}
@@ -196,7 +196,7 @@ const isOverdue = (dueDate) => {
 
 export function BoardView({ tasks, projects, onUpdateTask, onDeleteTask, onEditTask, onAddToToday }) {
   const handleDrop = async (taskId, newStatus, taskData) => {
-    const task = tasks.find(t => t.occurrence_id === taskId);
+    const task = tasks.find(t => t.id === taskId);
     if (!task || task.status === newStatus) return;
 
     await onUpdateTask({ ...task, status: newStatus });
