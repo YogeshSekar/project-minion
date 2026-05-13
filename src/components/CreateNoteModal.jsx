@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { X, Maximize2, Minimize2, Trash2, Folder } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
 import TipTapEditor from './TipTapEditor'
+import Dropdown from './ui/Dropdown'
 
 function CreateNoteModal({ isOpen, onClose, onNoteCreated, note = null }) {
   const [title, setTitle] = useState('Untitled Note')
@@ -48,6 +49,21 @@ function CreateNoteModal({ isOpen, onClose, onNoteCreated, note = null }) {
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [showProjectDropdown])
+
+  // Close modal when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (event.target === event.currentTarget) {
+        return
+      }
+      onClose()
+    }
+
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [isOpen])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -143,7 +159,7 @@ function CreateNoteModal({ isOpen, onClose, onNoteCreated, note = null }) {
           <div className="flex items-center gap-1 bg-gray-100 rounded-2xl p-1 mr-2">
             <button
               onClick={() => setNoteType('general')}
-              className={`px-3 py-1.5 text-sm font-medium rounded-2xl transition-colors ${
+              className={`px-3 py-1.5 text-sm font-medium rounded-full transition-colors ${
                 noteType === 'general'
                   ? 'bg-white text-gray-900 shadow-sm'
                   : 'text-gray-700 hover:bg-gray-200'
@@ -153,7 +169,7 @@ function CreateNoteModal({ isOpen, onClose, onNoteCreated, note = null }) {
             </button>
             <button
               onClick={() => setNoteType('meeting')}
-              className={`px-3 py-1.5 text-sm font-medium rounded-2xl transition-colors ${
+              className={`px-3 py-1.5 text-sm font-medium rounded-full transition-colors ${
                 noteType === 'meeting'
                   ? 'bg-white text-gray-900 shadow-sm'
                   : 'text-gray-700 hover:bg-gray-200'
@@ -164,40 +180,41 @@ function CreateNoteModal({ isOpen, onClose, onNoteCreated, note = null }) {
           </div>
 
           {/* Project Selector */}
-          <div className="relative" ref={projectDropdownRef}>
-            <button
-              onClick={() => setShowProjectDropdown(!showProjectDropdown)}
-              className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 hover:bg-gray-200 rounded-2xl transition-colors"
-            >
-              <Folder className="w-4 h-4" />
-              <span className="truncate max-w-24">
-                {projectId ? projects.find(p => p.id === projectId)?.title || 'Select Project' : 'No Project'}
-              </span>
-            </button>
-
-            {showProjectDropdown && (
-              <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-2xl shadow-lg border border-gray-200 py-1 z-50">
+          <div className="relative dropdown-container">
+            <Dropdown
+              trigger={
                 <button
-                  onClick={() => { setProjectId(null); setShowProjectDropdown(false) }}
-                  className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 transition-colors ${
-                    projectId === null ? 'bg-gray-200 text-gray-900' : 'text-gray-700'
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-50 text-gray-600 text-sm font-medium hover:bg-gray-100 transition-colors w-full"
+                >
+                  <Folder className="w-4 h-4" />
+                  <span className="truncate">
+                    {projectId ? projects.find(p => p.id === projectId)?.title || 'Select Project' : 'No Project'}
+                  </span>
+                </button>
+              }
+              align="right"
+              className="w-[180px]"
+            >
+              <button
+                onClick={() => { setProjectId(null); setShowProjectDropdown(false) }}
+                className={`w-full text-left px-2 py-1.5 text-sm hover:bg-gray-100 ${
+                  !projectId ? 'bg-gray-200 text-gray-900' : 'text-gray-900'
+                }`}
+              >
+                No Project
+              </button>
+              {projects.map(project => (
+                <button
+                  key={project.id}
+                  onClick={() => { setProjectId(project.id); setShowProjectDropdown(false) }}
+                  className={`w-full text-left px-2 py-1.5 text-sm hover:bg-gray-100 ${
+                    projectId === project.id ? 'bg-gray-200 text-gray-900' : 'text-gray-900'
                   }`}
                 >
-                  No Project
+                  {project.title}
                 </button>
-                {projects.map(project => (
-                  <button
-                    key={project.id}
-                    onClick={() => { setProjectId(project.id); setShowProjectDropdown(false) }}
-                    className={`w-full px-3 py-2 text-left text-sm hover:bg-gray-100 transition-colors ${
-                      projectId === project.id ? 'bg-gray-200 text-gray-900' : 'text-gray-700'
-                    }`}
-                  >
-                    {project.title}
-                  </button>
-                ))}
-              </div>
-            )}
+              ))}
+            </Dropdown>
           </div>
 
           {/* Fullscreen Toggle */}
@@ -229,20 +246,29 @@ function CreateNoteModal({ isOpen, onClose, onNoteCreated, note = null }) {
       </div>
 
       {/* Footer */}
-      <div className="flex items-center justify-end px-6 py-2 border-t border-gray-200 bg-gray-50">
+      <div className="flex items-center justify-end px-6 py-4 border-t border-gray-200 bg-gray-50">
         <div className="flex items-center gap-2">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+            className="px-4 py-1.5 text-gray-600 bg-white border border-gray-300 rounded-full hover:bg-gray-100 transition-colors text-sm font-medium"
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
             disabled={isSaving}
-            className="px-6 py-2 bg-gray-900 text-white text-sm font-medium rounded-2xl hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-1.5 px-4 py-1.5 bg-gray-900 text-white rounded-full hover:bg-gray-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isSaving ? 'Saving...' : 'Save Note'}
+            {isSaving ? (
+              <>
+                <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-white"></div>
+                Saving...
+              </>
+            ) : (
+              <>
+                Save Note
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -258,7 +284,7 @@ function CreateNoteModal({ isOpen, onClose, onNoteCreated, note = null }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="w-full max-w-5xl h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col">
         {modalContent}
       </div>

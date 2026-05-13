@@ -384,24 +384,7 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
                     <span>This Week</span>
                   </label>
                 </div>
-                <div className="mt-3 pt-3 border-t border-gray-200">
-                  <div className="px-2 py-1 text-xs font-medium text-gray-500 mb-2">Priority Legend</div>
-                  <div className="flex items-center justify-end gap-3">
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                      <span className="text-xs text-gray-600">High</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
-                      <span className="text-xs text-gray-600">Medium</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                      <span className="text-xs text-gray-600">Low</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
+                              </div>
             </div>
           )}
         </div>
@@ -439,17 +422,7 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
                   >
                     Date
                   </button>
-                  <button
-                    onClick={() => setSortOption('priority')}
-                    className={`w-full text-left px-3 py-2 text-sm rounded transition-colors ${
-                      sortOption === 'priority'
-                        ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
-                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600'
-                    }`}
-                  >
-                    Priority
-                  </button>
-                  <button
+                                    <button
                     onClick={() => setSortOption('created_date')}
                     className={`w-full text-left px-3 py-2 text-sm rounded transition-colors ${
                       sortOption === 'created_date'
@@ -530,8 +503,9 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
                 {/* Single Card with Status Filter + Task List */}
                 <div className="flex-1 flex flex-col h-full rounded-2xl border border-gray-200 bg-white overflow-hidden">
                   {/* Status Toggle Buttons - Fixed Header */}
-                  <div className="flex-shrink-0 p-4 border-b border-gray-200 flex items-center gap-2">
-                    <button
+                  <div className="flex-shrink-0 p-4 border-b border-gray-200 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <button
                       onClick={() => setShowTodo(!showTodo)}
                       className={`flex items-center justify-center gap-2 px-3 py-2 rounded-full transition-colors text-sm font-medium ${
                         showTodo
@@ -576,6 +550,22 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
                         </span>
                       )}
                     </button>
+                    </div>
+                    {/* Priority Legend */}
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full bg-red-500"></div>
+                        <span className="text-xs text-gray-600">High</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
+                        <span className="text-xs text-gray-600">Medium</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                        <span className="text-xs text-gray-600">Low</span>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Active Tasks List - Scrollable */}

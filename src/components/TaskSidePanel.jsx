@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import { invoke } from '@tauri-apps/api/core'
 import { X, Clock, Star, MoreVertical, CheckSquare, Plus, Trash2, Calendar, CalendarDays, Timer, Target, Loader2, Check, User, FileText } from 'lucide-react'
 import Dropdown from './ui/Dropdown'
 import DateTimePicker from './DateTimePicker'
@@ -34,8 +35,14 @@ function TaskSidePanel({
         estimated_minutes: task?.estimated_minutes || 0,
         actual_minutes: task?.actual_minutes || 0,
       })
-      setChecklist(task?.checklist || [])
       setErrors({})
+      
+      // Load checklist items from backend if task exists
+      if (task?.id) {
+        loadChecklistItems(task.id)
+      } else {
+        setChecklist([])
+      }
     }
   }, [panelKey, isOpen])
 
@@ -174,6 +181,9 @@ function TaskSidePanel({
       if (mode === 'create') {
         const response = await onCreateTask(buildTaskPayload())
         if (response.success) {
+          // Create checklist items for the new task
+          await createChecklistItemsForNewTask(response.data.id)
+          
           onSave(response.data)
           onClose()
         } else {
@@ -271,33 +281,167 @@ function TaskSidePanel({
     }
   }
 
-  // Checklist functions
-  const addChecklistItem = () => {
-    if (newChecklistItem.trim()) {
-      const newItem = {
-        id: Date.now().toString(),
-        text: newChecklistItem.trim(),
-        completed: false
+  // Load checklist items from backend
+  const loadChecklistItems = async (taskId) => {
+    try {
+      const result = await invoke('get_checklist_items_by_task', { taskId })
+      if (result.success && result.data) {
+        // Convert backend data to frontend format
+        const items = result.data.map(item => ({
+          id: item.id,
+          text: item.text,
+          completed: item.is_completed === 1
+        }))
+        setChecklist(items)
       }
-      setChecklist([...checklist, newItem])
-      setNewChecklistItem('')
+    } catch (error) {
+      console.error('Failed to load checklist items:', error)
     }
   }
 
-  const toggleChecklistItem = (id) => {
-    setChecklist(checklist.map(item => 
-      item.id === id ? { ...item, completed: !item.completed } : item
-    ))
+  // Create checklist items for new task after it's saved
+  const createChecklistItemsForNewTask = async (taskId) => {
+    // Filter out items that are already created in backend (have numeric IDs)
+    // Backend IDs are typically smaller numbers, local IDs are large timestamps
+    const itemsToCreate = checklist.filter(item => {
+      const idNum = parseInt(item.id)
+      return isNaN(idNum) || idNum > 1000000 // IDs larger than 1M are likely timestamps
+    })
+    
+    // Create items and update their IDs with real database IDs
+    for (let i = 0; i < itemsToCreate.length; i++) {
+      const item = itemsToCreate[i]
+      try {
+        const result = await invoke('create_checklist_item', {
+          req: {
+            task_id: taskId,
+            text: item.text,
+            is_completed: item.completed ? 1 : 0,
+            sort_order: i
+          }
+        })
+        
+        // Replace temporary ID with real database ID
+        if (result.success && result.data) {
+          setChecklist(prev => prev.map(checklistItem => 
+            checklistItem.id === item.id 
+              ? { id: result.data.id, text: result.data.text, completed: result.data.is_completed === 1 }
+              : checklistItem
+          ))
+        }
+      } catch (error) {
+        console.error('Failed to create checklist item:', error)
+      }
+    }
   }
 
-  const deleteChecklistItem = (id) => {
+  // Checklist functions
+  const addChecklistItem = async () => {
+    if (!newChecklistItem.trim()) return
+
+    const newItem = {
+      id: Date.now().toString(),
+      text: newChecklistItem.trim(),
+      completed: false
+    }
+    
+    // Always add to local state immediately
+    setChecklist([...checklist, newItem])
+    setNewChecklistItem('')
+
+    // If task exists, create checklist item immediately
+    if (task?.id) {
+      try {
+        const result = await invoke('create_checklist_item', {
+          req: {
+            task_id: task.id,
+            text: newChecklistItem.trim(),
+            is_completed: 0,
+            sort_order: checklist.length
+          }
+        })
+        
+        if (result.success && result.data) {
+          // Replace temp item with real item from backend
+          setChecklist(prev => prev.map(item => 
+            item.id === newItem.id 
+              ? { id: result.data.id, text: result.data.text, completed: result.data.is_completed === 1 }
+              : item
+          ))
+        }
+      } catch (error) {
+        console.error('Failed to create checklist item:', error)
+        // Revert optimistic update on error
+        setChecklist(prev => prev.filter(item => item.id !== newItem.id))
+      }
+    }
+    // For new tasks, checklist items will be created after task is saved
+  }
+
+  const toggleChecklistItem = async (id) => {
+    const item = checklist.find(item => item.id === id)
+    if (!item) return
+
+    // Optimistic update
+    setChecklist(checklist.map(checklistItem => 
+      checklistItem.id === id ? { ...checklistItem, completed: !checklistItem.completed } : checklistItem
+    ))
+
+    try {
+      await invoke('update_checklist_item', {
+        req: {
+          id: id,
+          is_completed: !item.completed ? 1 : 0
+        }
+      })
+    } catch (error) {
+      console.error('Failed to update checklist item:', error)
+      // Revert optimistic update on error
+      setChecklist(checklist.map(checklistItem => 
+        checklistItem.id === id ? { ...checklistItem, completed: item.completed } : checklistItem
+      ))
+    }
+  }
+
+  const deleteChecklistItem = async (id) => {
+    const itemToDelete = checklist.find(item => item.id === id)
+    if (!itemToDelete) return
+
+    // Optimistic update
     setChecklist(checklist.filter(item => item.id !== id))
+
+    try {
+      await invoke('delete_checklist_item', { id })
+    } catch (error) {
+      console.error('Failed to delete checklist item:', error)
+      // Revert optimistic update on error
+      setChecklist(prev => [...prev, itemToDelete])
+    }
   }
 
-  const updateChecklistItem = (id, text) => {
-    setChecklist(checklist.map(item => 
-      item.id === id ? { ...item, text } : item
+  const updateChecklistItem = async (id, text) => {
+    const item = checklist.find(item => item.id === id)
+    if (!item) return
+
+    // Optimistic update
+    setChecklist(checklist.map(checklistItem => 
+      checklistItem.id === id ? { ...checklistItem, text } : checklistItem
     ))
+
+    try {
+      await invoke('update_checklist_item', {
+        req: {
+          id: id,
+          text: text
+        }
+      })
+    } catch (error) {
+      console.error('Failed to update checklist item:', error)
+      // Revert optimistic update on error
+      setChecklist(checklist.map(checklistItem => 
+        checklistItem.id === id ? { ...checklistItem, text: item.text } : checklistItem
+      ))
+    }
   }
 
   const handleChecklistKeyDown = (e) => {
@@ -473,7 +617,7 @@ function TaskSidePanel({
 </div>
 
             {/* Right Column - Properties */}
-            <div className="w-[400px] space-y-3">
+            <div className="w-[400px] space-y-4">
               {/* Created Time */}
               <div className="grid grid-cols-2 gap-4 items-center">
                 <div className="flex items-center gap-2">

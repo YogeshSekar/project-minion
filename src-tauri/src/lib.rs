@@ -7,7 +7,8 @@ use commands::{create_project, delete_project, get_all_projects, get_project, up
     create_note, delete_note, get_all_notes, get_note, get_notes_by_project, update_note,
     create_activity, delete_activity, get_activities, get_activity_by_id, get_activities_by_reference, get_running_activity, update_activity,
     create_habit, delete_habit, get_all_habits, get_habit, update_habit,
-    toggle_habit_completion, get_habit_logs};
+    toggle_habit_completion, get_habit_logs,
+    create_checklist_item, get_checklist_items_by_task, update_checklist_item, delete_checklist_item};
 use outlook::get_outlook_meetings;
 use database::init_db;
 use tauri::Manager;
@@ -68,7 +69,11 @@ pub fn run() {
             update_habit,
             delete_habit,
             toggle_habit_completion,
-            get_habit_logs
+            get_habit_logs,
+            create_checklist_item,
+            get_checklist_items_by_task,
+            update_checklist_item,
+            delete_checklist_item
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

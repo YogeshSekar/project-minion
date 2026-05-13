@@ -245,6 +245,23 @@ async fn create_tables(pool: &Pool<Sqlite>) -> Result<(), sqlx::Error> {
     .execute(pool)
     .await?;
 
+    // Create task_checklist_items table
+    sqlx::query(
+        r#"
+        CREATE TABLE IF NOT EXISTS task_checklist_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            task_id INTEGER NOT NULL,
+            text TEXT NOT NULL,
+            is_completed INTEGER NOT NULL DEFAULT 0,
+            sort_order INTEGER DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(task_id) REFERENCES tasks(id) ON DELETE CASCADE
+        )
+        "#,
+    )
+    .execute(pool)
+    .await?;
+
     // Create indexes for task_completion_logs table
     sqlx::query(
         r#"
@@ -257,6 +274,23 @@ async fn create_tables(pool: &Pool<Sqlite>) -> Result<(), sqlx::Error> {
     sqlx::query(
         r#"
         CREATE INDEX IF NOT EXISTS idx_completion_occurrence_date ON task_completion_logs(occurrence_date)
+        "#,
+    )
+    .execute(pool)
+    .await?;
+
+    // Create indexes for task_checklist_items table
+    sqlx::query(
+        r#"
+        CREATE INDEX IF NOT EXISTS idx_checklist_task_id ON task_checklist_items(task_id)
+        "#,
+    )
+    .execute(pool)
+    .await?;
+
+    sqlx::query(
+        r#"
+        CREATE INDEX IF NOT EXISTS idx_checklist_sort_order ON task_checklist_items(sort_order)
         "#,
     )
     .execute(pool)

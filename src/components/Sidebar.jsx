@@ -29,7 +29,7 @@ export default function Sidebar({
         bg-white
         border border-gray-200
         rounded-2xl
-        m-4
+        ml-4 mt-4 mb-4
         transition-all duration-300 ease-in-out
       `}
     >

@@ -326,6 +326,7 @@ function App() {
         onCreateTask={createTask}
         isExpanded={isQuickAddExpanded}
         setIsExpanded={setIsQuickAddExpanded}
+        onTaskCreated={() => setTaskRefreshTrigger(prev => prev + 1)}
       />
     </div>
   )

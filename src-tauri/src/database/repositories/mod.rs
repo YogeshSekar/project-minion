@@ -9,6 +9,7 @@ pub mod activity;
 pub mod habit;
 pub mod habit_log;
 pub mod task_completion_log;
+pub mod task_checklist;
 
 // Re-export all repository functions for easier access
 pub use project::*;
@@ -19,3 +20,4 @@ pub use activity::*;
 pub use habit::*;
 pub use habit_log::*;
 pub use task_completion_log::*;
+pub use task_checklist::*;

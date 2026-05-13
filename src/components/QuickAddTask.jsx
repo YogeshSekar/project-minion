@@ -3,7 +3,7 @@ import { Plus, X, Check, Send } from 'lucide-react'
 import useClickOutside from '../hooks/useClickOutside'
 import useProjects from '../hooks/useProjects'
 
-function QuickAddTask({ onCreateTask, isExpanded, setIsExpanded }) {
+function QuickAddTask({ onCreateTask, isExpanded, setIsExpanded, onTaskCreated }) {
   const [title, setTitle] = useState('')
   const [projectId, setProjectId] = useState(null)
   const [priority, setPriority] = useState('medium')
@@ -85,6 +85,8 @@ function QuickAddTask({ onCreateTask, isExpanded, setIsExpanded }) {
       setShowSuccess(true)
       // Keep expanded for next task
       inputRef.current?.focus()
+      // Trigger task refresh
+      onTaskCreated?.()
     }
     
     setIsAdding(false)

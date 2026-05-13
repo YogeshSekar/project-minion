@@ -9,6 +9,7 @@ pub mod activity;
 pub mod habit;
 pub mod habit_log;
 pub mod task_completion_log;
+pub mod task_checklist;
 
 // Re-export all models for easier access
 pub use project::{Project, CreateProjectRequest, UpdateProjectRequest};
@@ -19,3 +20,4 @@ pub use activity::{Activity, CreateActivityRequest, UpdateActivityRequest};
 pub use habit::{Habit, CreateHabitRequest, UpdateHabitRequest};
 pub use habit_log::{HabitLog, CreateHabitLogRequest, UpdateHabitLogRequest};
 pub use task_completion_log::{TaskCompletionLog, CreateTaskCompletionLogRequest, UpdateTaskCompletionLogRequest};
+pub use task_checklist::{TaskChecklistItem, CreateTaskChecklistItemRequest, UpdateTaskChecklistItemRequest};

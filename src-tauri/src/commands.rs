@@ -11,6 +11,7 @@ use crate::database::models::{
     CreateHabitRequest, Habit, UpdateHabitRequest,
     CreateHabitLogRequest, HabitLog, UpdateHabitLogRequest,
     CreateTaskCompletionLogRequest, TaskCompletionLog, UpdateTaskCompletionLogRequest,
+    CreateTaskChecklistItemRequest, TaskChecklistItem, UpdateTaskChecklistItemRequest,
 };
 
 // Import repository functions from the new modular structure
@@ -48,6 +49,11 @@ use crate::database::repositories::{
     delete_task_completion_log as db_delete_task_completion_log,
     mark_completion_log_undone as db_mark_completion_log_undone,
     get_completion_logs_by_date_range as db_get_completion_logs_by_date_range,
+    create_checklist_item as db_create_checklist_item,
+    get_checklist_items_by_task as db_get_checklist_items_by_task,
+    update_checklist_item as db_update_checklist_item,
+    delete_checklist_item as db_delete_checklist_item,
+    get_checklist_item_by_id as db_get_checklist_item_by_id,
 };
 
 // Import habit stats function from habit repository
@@ -920,6 +926,83 @@ pub async fn get_habit_logs(
         Ok(logs) => Ok(ApiResponse {
             success: true,
             data: Some(logs),
+            error: None,
+        }),
+        Err(e) => Ok(ApiResponse {
+            success: false,
+            data: None,
+            error: Some(format!("{}", e)),
+        }),
+    }
+}
+
+// Checklist Commands
+#[tauri::command]
+pub async fn create_checklist_item(
+    state: State<'_, DbState>,
+    req: CreateTaskChecklistItemRequest,
+) -> Result<ApiResponse<TaskChecklistItem>, String> {
+    match db_create_checklist_item(&state.pool, req).await {
+        Ok(item) => Ok(ApiResponse {
+            success: true,
+            data: Some(item),
+            error: None,
+        }),
+        Err(e) => Ok(ApiResponse {
+            success: false,
+            data: None,
+            error: Some(format!("{}", e)),
+        }),
+    }
+}
+
+#[tauri::command]
+pub async fn get_checklist_items_by_task(
+    state: State<'_, DbState>,
+    task_id: i64,
+) -> Result<ApiResponse<Vec<TaskChecklistItem>>, String> {
+    match db_get_checklist_items_by_task(&state.pool, task_id).await {
+        Ok(items) => Ok(ApiResponse {
+            success: true,
+            data: Some(items),
+            error: None,
+        }),
+        Err(e) => Ok(ApiResponse {
+            success: false,
+            data: None,
+            error: Some(format!("{}", e)),
+        }),
+    }
+}
+
+#[tauri::command]
+pub async fn update_checklist_item(
+    state: State<'_, DbState>,
+    req: UpdateTaskChecklistItemRequest,
+) -> Result<ApiResponse<TaskChecklistItem>, String> {
+    match db_update_checklist_item(&state.pool, req).await {
+        Ok(item) => Ok(ApiResponse {
+            success: true,
+            data: Some(item),
+            error: None,
+        }),
+        Err(e) => Ok(ApiResponse {
+            success: false,
+            data: None,
+            error: Some(format!("{}", e)),
+        }),
+    }
+}
+
+#[tauri::command]
+pub async fn delete_checklist_item(
+    state: State<'_, DbState>,
+    id: i64,
+) -> Result<ApiResponse<String>, String> {
+    match db_delete_checklist_item(&state.pool, id).await {
+        Ok(_) => Ok(ApiResponse {
+            success: true,
+            data: Some("Checklist item deleted successfully".to_string()),
             error: None,
         }),
         Err(e) => Ok(ApiResponse {
