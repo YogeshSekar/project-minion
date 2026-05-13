@@ -30,7 +30,7 @@ function TaskSidePanel({
         due_date: task?.due_date || '',
         scheduled_date: task?.scheduled_date || '',
         is_recurring: task?.is_recurring === 1 || false,
-        recurrence_type: task?.recurrence_type || '',
+        recurrence_type: task?.recurrence_type || 'daily',
         recurrence_interval: task?.recurrence_interval || 1,
         estimated_minutes: task?.estimated_minutes || 0,
         actual_minutes: task?.actual_minutes || 0,
@@ -55,7 +55,7 @@ function TaskSidePanel({
     due_date: '',
     scheduled_date: '',
     is_recurring: false,
-    recurrence_type: '',
+    recurrence_type: 'daily',
     recurrence_interval: 1,
     estimated_minutes: 0,
     actual_minutes: 0,
@@ -530,7 +530,7 @@ function TaskSidePanel({
       value={formData.description}
       onChange={(e) => handleChange('description', e.target.value)}
       placeholder="Add detailed description..."
-      rows={4}
+      rows={10}
       className="w-full px-3 py-2 text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none"
     />
   </div>

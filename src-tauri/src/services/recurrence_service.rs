@@ -110,16 +110,18 @@ pub async fn complete_recurring_task(
     let recurrence_type = task.recurrence_type.as_ref()
         .ok_or("Task missing recurrence_type")?;
     
-    // Handle null scheduled_date by using current date
-    let scheduled_date = if let Some(date) = task.scheduled_date.as_ref() {
-        date
+    // Handle null scheduled_date by using current date - own the String to avoid dangling references
+    let owned_scheduled_date = if let Some(date) = task.scheduled_date.as_ref() {
+        date.clone()
     } else {
         // Use current date when scheduled_date is null
-        &Utc::now().format("%Y-%m-%d").to_string()
+        Utc::now().format("%Y-%m-%d").to_string()
     };
 
     // 2. Insert row into task_completion_logs
     let current_timestamp = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    
+    println!("DEBUG: complete_recurring_task - task_id: {}, scheduled_date: {}, next will be calculated", task.id, owned_scheduled_date);
     
     let completion_log = sqlx::query_as::<_, TaskCompletionLog>(
         r#"
@@ -129,7 +131,7 @@ pub async fn complete_recurring_task(
         "#,
     )
     .bind(task.id)
-    .bind(scheduled_date)
+    .bind(&owned_scheduled_date)
     .bind(&current_timestamp)
     .fetch_one(&mut *tx)
     .await
@@ -137,12 +139,14 @@ pub async fn complete_recurring_task(
 
     // 3. Calculate next scheduled_date using existing helper
     let next_scheduled_date = calculate_next_scheduled_date(
-        scheduled_date,
+        &owned_scheduled_date,
         recurrence_type,
         task.recurrence_interval.unwrap_or(1) as i64,
     ).map_err(|e| format!("Failed to calculate next scheduled date: {}", e))?;
 
     // 4. Update task with next scheduled date and reset status
+    println!("DEBUG: Updating task {} - new scheduled_date: {}, resetting status to todo", task.id, next_scheduled_date);
+    
     sqlx::query(
         r#"
         UPDATE tasks 
@@ -160,6 +164,7 @@ pub async fn complete_recurring_task(
     tx.commit().await
         .map_err(|e| format!("Failed to commit transaction: {}", e))?;
 
+    println!("DEBUG: Successfully completed recurring task {} - next scheduled: {}", task.id, next_scheduled_date);
     Ok(completion_log)
 }
 

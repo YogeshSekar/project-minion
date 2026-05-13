@@ -37,14 +37,11 @@ function useTasks() {
     const response = await updateTaskService(payload)
     if (response.success) {
       // Update local state immediately for better UX
-      // For occurrence updates, match by occurrence_id
-      // For parent task updates, match by task_id
+      // Match tasks by id field from backend
       setTasks(prevTasks =>
         prevTasks.map(task => {
-          if (payload.occurrence_id) {
-            return task.occurrence_id === payload.occurrence_id ? { ...task, ...payload } : task
-          } else if (payload.id) {
-            return task.task_id === payload.id ? { ...task, ...payload } : task
+          if (payload.id) {
+            return task.id === payload.id ? { ...task, ...payload } : task
           }
           return task
         })

@@ -223,8 +223,8 @@ export function BoardView({ tasks, projects, onUpdateTask, onDeleteTask, onEditT
   };
 
   return (
-    <div className="h-full w-full flex gap-6 p-4 select-none">
-      <div className="flex-1 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-6 flex gap-6 overflow-hidden">
+    <div className="h-full w-full flex gap-6 select-none">
+      <div className="flex-1 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 flex gap-6 overflow-hidden">
         <BoardColumn
         title="To Do"
         columnId="todo"
