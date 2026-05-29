@@ -56,48 +56,38 @@ function HorizontalTimeline({ selectedDate, tasks, onTaskClick }) {
   // Generate timeline data
   const generateTimelineData = () => {
     const timeline = []
-    
+    const selectedDateOnly = new Date(selectedDate)
+    selectedDateOnly.setHours(0, 0, 0, 0)
+
     console.log('[DEBUG] HorizontalTimeline generateTimelineData called')
     console.log('[DEBUG] Total tasks received:', tasks.length)
     console.log('[DEBUG] Selected date:', selectedDate.toDateString())
     console.log('[DEBUG] Tasks with scheduled_date:', tasks.filter(t => t.scheduled_date).length)
 
-    tasks.forEach(task => {
-      // Show tasks if they have a scheduled_date matching the selected date
-      // OR if they don't have a scheduled_date (show them for today)
-      let shouldShow = false
-      
-      if (task.scheduled_date) {
-        const taskDate = new Date(task.scheduled_date)
-        const selectedDateOnly = new Date(selectedDate)
-        selectedDateOnly.setHours(0, 0, 0, 0)
-        taskDate.setHours(0, 0, 0, 0)
-        shouldShow = taskDate.getTime() === selectedDateOnly.getTime()
-      } else {
-        // Tasks without scheduled_date show up for today
-        const today = new Date()
-        const selectedDateOnly = new Date(selectedDate)
-        selectedDateOnly.setHours(0, 0, 0, 0)
-        today.setHours(0, 0, 0, 0)
-        shouldShow = today.getTime() === selectedDateOnly.getTime()
-      }
+    const scheduledTasks = tasks.filter((task) => {
+      if (!task.scheduled_date) return false
+      const taskDate = new Date(task.scheduled_date)
+      taskDate.setHours(0, 0, 0, 0)
+      return taskDate.getTime() === selectedDateOnly.getTime()
+    })
 
-      if (shouldShow) {
-        let estimatedTime = '9:00 AM'
-        if (task.priority === 'high') estimatedTime = '10:00 AM'
-        else if (task.priority === 'medium') estimatedTime = '2:00 PM'
-        else estimatedTime = '3:00 PM'
+    console.log('[DEBUG] Scheduled tasks for selected date:', scheduledTasks.length)
 
-        timeline.push({
-          id: `task-${task.id}`,
-          type: 'task',
-          time: estimatedTime,
-          title: task.title.length > 50 ? task.title.substring(0, 50) + '...' : task.title,
-          priority: task.priority,
-          status: task.status,
-          duration: getTaskDuration(task)
-        })
-      }
+    scheduledTasks.forEach(task => {
+      let estimatedTime = '9:00 AM'
+      if (task.priority === 'high') estimatedTime = '10:00 AM'
+      else if (task.priority === 'medium') estimatedTime = '2:00 PM'
+      else estimatedTime = '3:00 PM'
+
+      timeline.push({
+        id: `task-${task.id}`,
+        type: 'task',
+        time: estimatedTime,
+        title: task.title.length > 50 ? task.title.substring(0, 50) + '...' : task.title,
+        priority: task.priority,
+        status: task.status,
+        duration: getTaskDuration(task)
+      })
     })
     
     meetings.forEach(meeting => {
@@ -302,19 +292,19 @@ function HorizontalTimeline({ selectedDate, tasks, onTaskClick }) {
         {/* Right: Stats */}
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <CheckCircle className="w-4 h-4 text-gray-600" />
+            <CheckCircle className="w-4 h-4 text-emerald-500" />
             <span className="text-sm font-medium text-gray-900">
               {tasks.filter(t => t.status === 'completed').length} completed
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <Video className="w-4 h-4 text-gray-600" />
+            <Video className="w-4 h-4 text-sky-500" />
             <span className="text-sm font-medium text-gray-900">
               {meetings.length} meetings
             </span>
           </div>
           <div className="flex items-center gap-2">
-            <Clock className="w-4 h-4 text-gray-600" />
+            <Clock className="w-4 h-4 text-violet-500" />
             <span className="text-sm font-medium text-gray-900">
               {timelineData.reduce((total, item) => total + (item.duration || 30), 0)}m total
             </span>
@@ -339,7 +329,7 @@ function HorizontalTimeline({ selectedDate, tasks, onTaskClick }) {
             return (
               <div
                 key={hour}
-                className="text-xs text-gray-500 px-1 py-1 border-l border-gray-200"
+                className="text-xs font-semibold text-gray-700 px-1 py-1 border-l border-gray-200 bg-white/80"
                 style={{ width: `${hourWidth}px`, flexShrink: 0 }}
               >
                 {timeLabel}
@@ -362,10 +352,10 @@ function HorizontalTimeline({ selectedDate, tasks, onTaskClick }) {
           {/* Current time indicator */}
           {isToday && (
             <div
-              className="absolute top-0 bottom-0 w-1 bg-red-500 z-20 shadow-lg"
+              className="absolute top-0 bottom-0 w-1 bg-red-600 border-l border-red-400 z-20 shadow-lg"
               style={{ left: `${getCurrentTimePosition()}px` }}
             >
-              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-3 h-3 bg-red-500 rounded-full shadow-md animate-pulse" />
+              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-4 h-4 bg-red-600 rounded-full shadow-md animate-pulse" />
             </div>
           )}
 

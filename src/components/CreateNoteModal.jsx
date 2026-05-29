@@ -14,6 +14,7 @@ function CreateNoteModal({ isOpen, onClose, onNoteCreated, note = null }) {
   const [isFullScreen, setIsFullScreen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const projectDropdownRef = useRef(null)
+  const modalRef = useRef(null)
 
   // Load projects when modal opens
   useEffect(() => {
@@ -53,17 +54,16 @@ function CreateNoteModal({ isOpen, onClose, onNoteCreated, note = null }) {
   // Close modal when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (event.target === event.currentTarget) {
-        return
+      if (modalRef.current && !modalRef.current.contains(event.target)) {
+        onClose()
       }
-      onClose()
     }
 
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside)
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
-  }, [isOpen])
+  }, [isOpen, onClose])
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -277,7 +277,7 @@ function CreateNoteModal({ isOpen, onClose, onNoteCreated, note = null }) {
 
   if (isFullScreen) {
     return (
-      <div className="fixed inset-0 z-50 bg-white">
+      <div ref={modalRef} className="fixed inset-0 z-[60] bg-white">
         {modalContent}
       </div>
     )
@@ -285,7 +285,7 @@ function CreateNoteModal({ isOpen, onClose, onNoteCreated, note = null }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-5xl h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+      <div ref={modalRef} className="w-full max-w-5xl h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col">
         {modalContent}
       </div>
     </div>

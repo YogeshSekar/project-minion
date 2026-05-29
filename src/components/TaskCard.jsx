@@ -24,7 +24,7 @@ function TaskCard({
       }}
       onMouseDown={(e) => onMouseDown?.(e, task.id, { title: task.title, status: task.status })}
       className={`
-        bg-white rounded-2xl border border-gray-200 p-4 hover:shadow-md transition-all
+        bg-white rounded-2xl border border-gray-250 p-4 hover:shadow-md transition-all
         ${isDragging ? 'opacity-40 cursor-grabbing' : 'cursor-pointer'}
       `}
     >
@@ -149,3 +149,5 @@ function TaskCard({
 }
 
 export default TaskCard
+
+

@@ -159,7 +159,7 @@ function HomePage({ openTaskModal, taskRefreshTrigger = 0, onActivityStarted, on
 
     const inProgressTasks = tasks.filter(task => {
       if (task.status !== 'in_progress') return false
-      if (!task.scheduled_date) return true
+      if (!task.scheduled_date) return false
       const taskDate = new Date(task.scheduled_date)
       taskDate.setHours(0, 0, 0, 0)
       return taskDate.getTime() === targetDate.getTime()
@@ -167,7 +167,7 @@ function HomePage({ openTaskModal, taskRefreshTrigger = 0, onActivityStarted, on
 
     const todoTasks = tasks.filter(task => {
       if (task.status !== 'todo') return false
-      if (!task.scheduled_date) return true
+      if (!task.scheduled_date) return false
       const taskDate = new Date(task.scheduled_date)
       taskDate.setHours(0, 0, 0, 0)
       return taskDate.getTime() === targetDate.getTime()

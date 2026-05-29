@@ -13,7 +13,7 @@ import { formatDate, getPriorityBgColor, isOverdue } from '../utils/helpers'
 import { groupCompletedTasks } from '../utils/taskGrouping'
 
 function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, onActivityStopped, runningActivity: propRunningActivity }) {
-  const [viewMode, setViewMode] = useState('list')
+  const [viewMode, setViewMode] = useState('board')
   const [showCompleted, setShowCompleted] = useState(false)
   const [showTodo, setShowTodo] = useState(true)
   const [showInProgress, setShowInProgress] = useState(true)
@@ -155,10 +155,18 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
   const handleAddToToday = async (task) => {
     const today = new Date()
     const todayStr = today.toISOString().split('T')[0]
-    // Update parent task definition (scheduled_date is a parent task field)
     const response = await updateTask({
-      id: task.task_id,
-      scheduled_date: todayStr
+      id: task.id,
+      title: task.title,
+      description: task.description,
+      status: task.status,
+      priority: task.priority,
+      due_date: task.due_date,
+      scheduled_date: todayStr,
+      project_id: task.project_id,
+      is_recurring: task.is_recurring,
+      recurrence_type: task.recurrence_type,
+      recurrence_interval: task.recurrence_interval
     })
     if (!response.success) {
       console.error('Error adding task to today:', response.error)
@@ -284,18 +292,6 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
         {/* View Toggle */}
         <div className="flex items-center gap-1 bg-gray-100 rounded-full p-1">
           <button
-            onClick={() => setViewMode('list')}
-            className={`flex-1 px-3 py-2 rounded-full transition-colors text-sm font-medium flex items-center justify-center gap-2 ${
-              viewMode === 'list'
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-            title="List View"
-          >
-            <List className="w-4 h-4" />
-            List
-          </button>
-          <button
             onClick={() => setViewMode('board')}
             className={`flex-1 px-3 py-2 rounded-full transition-colors text-sm font-medium flex items-center justify-center gap-2 ${
               viewMode === 'board'
@@ -306,6 +302,18 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
           >
             <LayoutGrid className="w-4 h-4" />
             Board
+          </button>
+          <button
+            onClick={() => setViewMode('list')}
+            className={`flex-1 px-3 py-2 rounded-full transition-colors text-sm font-medium flex items-center justify-center gap-2 ${
+              viewMode === 'list'
+                ? 'bg-white text-gray-900 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+            title="List View"
+          >
+            <List className="w-4 h-4" />
+            List
           </button>
         </div>
 
