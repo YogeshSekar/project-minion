@@ -64,12 +64,22 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
 
   const handleStartTaskActivity = async (task) => {
     try {
+      // If the task is in 'todo' status, update it to 'in_progress' before starting activity
+      if (task.status === 'todo') {
+        const updateResp = await updateTask({ ...task, status: 'in_progress' })
+        if (!updateResp.success) {
+          console.error('Error updating task status to in_progress:', updateResp.error)
+        } else {
+          // Update the local task object to reflect new status for subsequent activity payload
+          task = { ...task, status: 'in_progress' }
+        }
+      }
       const response = await startActivity({
         title: task.title,
         activity_type: 'focus_session',
         source: 'manual',
         reference_type: 'task',
-        reference_id: task.task_id,
+        reference_id: task.id,
         project_id: task.project_id
       })
       if (response.success) {
@@ -633,6 +643,9 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
               onDeleteTask={handleDeleteTask}
               onEditTask={handleEditTask}
               onAddToToday={handleAddToToday}
+              onStartActivity={handleStartTaskActivity}
+              onStopActivity={handleStopTaskActivity}
+              runningActivity={runningActivity}
             />
           </div>
         )}

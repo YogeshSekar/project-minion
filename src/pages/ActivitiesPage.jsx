@@ -206,36 +206,6 @@ function ActivitiesPage() {
 
             <div className="h-6 w-px bg-gray-200 mx-1" />
 
-            {/* Task Selector */}
-            <div ref={quickTaskDropdown.ref} className="relative">
-              <button
-                onClick={() => quickTaskDropdown.setIsOpen(!quickTaskDropdown.isOpen)}
-                className="flex items-center gap-1 px-3 py-1.5 text-sm rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
-              >
-                {quickSelectedTask ? getTaskTitle(quickSelectedTask) : 'No Task'}
-                <ChevronDown className="w-3 h-3" />
-              </button>
-              {quickTaskDropdown.isOpen && (
-                <div className="absolute top-full left-0 mt-2 w-48 bg-white rounded-lg border border-gray-200 shadow-lg z-10 max-h-48 overflow-y-auto">
-                  <div
-                    onClick={() => { setQuickSelectedTask(null); quickTaskDropdown.setIsOpen(false) }}
-                    className={`px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 ${!quickSelectedTask ? 'bg-gray-100 text-gray-900' : 'text-gray-700'}`}
-                  >
-                    No Task
-                  </div>
-                  {tasks.map(task => (
-                    <div
-                      key={task.id}
-                      onClick={() => { setQuickSelectedTask(task.id); quickTaskDropdown.setIsOpen(false) }}
-                      className={`px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 truncate ${quickSelectedTask === task.id ? 'bg-gray-100 text-gray-900' : 'text-gray-700'}`}
-                    >
-                      {task.title}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
             {/* Project Selector */}
             <div ref={quickProjectDropdown.ref} className="relative">
               <button
@@ -257,9 +227,42 @@ function ActivitiesPage() {
                     <div
                       key={project.id}
                       onClick={() => { setQuickSelectedProject(project.id); quickProjectDropdown.setIsOpen(false) }}
-                      className={`px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 truncate ${quickSelectedProject === project.id ? 'bg-gray-100 text-gray-900' : 'text-gray-700'}`}
+                      className={`px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 ${quickSelectedProject === project.id ? 'bg-gray-100 text-gray-900' : 'text-gray-700'}`}
                     >
                       {project.title}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Task Selector */}
+            <div ref={quickTaskDropdown.ref} className="relative">
+              <button
+                onClick={() => quickTaskDropdown.setIsOpen(!quickTaskDropdown.isOpen)}
+                className="flex items-center gap-1 px-3 py-1.5 text-sm rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+              >
+                {quickSelectedTask ? getTaskTitle(quickSelectedTask) : 'No Task'}
+                <ChevronDown className="w-3 h-3" />
+              </button>
+              {quickTaskDropdown.isOpen && (
+                <div className="absolute top-full left-0 mt-2 w-48 bg-white rounded-lg border border-gray-200 shadow-lg z-10 max-h-48 overflow-y-auto">
+                  <div
+                    onClick={() => { setQuickSelectedTask(null); quickTaskDropdown.setIsOpen(false) }}
+                    className={`px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 ${!quickSelectedTask ? 'bg-gray-100 text-gray-900' : 'text-gray-700'}`}
+                  >
+                    No Task
+                  </div>
+                  {tasks
+                    .filter(task => task.status === 'todo' || task.status === 'in_progress')
+                    .filter(task => !quickSelectedProject || task.project_id === quickSelectedProject)
+                    .map(task => (
+                    <div
+                      key={task.id}
+                      onClick={() => { setQuickSelectedTask(task.id); quickTaskDropdown.setIsOpen(false) }}
+                      className={`px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 truncate ${quickSelectedTask === task.id ? 'bg-gray-100 text-gray-900' : 'text-gray-700'}`}
+                    >
+                      {task.title}
                     </div>
                   ))}
                 </div>
@@ -309,36 +312,6 @@ function ActivitiesPage() {
           <div className="space-y-3">
             {/* Selectors Row */}
             <div className="flex items-center gap-3">
-              {/* Task Selector */}
-              <div ref={manualTaskDropdown.ref} className="relative">
-                <button
-                  onClick={() => manualTaskDropdown.setIsOpen(!manualTaskDropdown.isOpen)}
-                  className="flex items-center gap-1 px-3 py-1.5 text-sm rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
-                >
-                  {manualSelectedTask ? getTaskTitle(manualSelectedTask) : 'No Task'}
-                  <ChevronDown className="w-3 h-3" />
-                </button>
-                {manualTaskDropdown.isOpen && (
-                  <div className="absolute top-full left-0 mt-2 w-48 bg-white rounded-lg border border-gray-200 shadow-lg z-10 max-h-48 overflow-y-auto">
-                    <div
-                      onClick={() => { setManualSelectedTask(null); manualTaskDropdown.setIsOpen(false) }}
-                      className={`px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 ${!manualSelectedTask ? 'bg-gray-100 text-gray-900' : 'text-gray-700'}`}
-                    >
-                      No Task
-                    </div>
-                    {tasks.map(task => (
-                      <div
-                        key={task.id}
-                        onClick={() => { setManualSelectedTask(task.id); manualTaskDropdown.setIsOpen(false) }}
-                        className={`px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 truncate ${manualSelectedTask === task.id ? 'bg-gray-100 text-gray-900' : 'text-gray-700'}`}
-                      >
-                        {task.title}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
               {/* Project Selector */}
               <div ref={manualProjectDropdown.ref} className="relative">
                 <button
@@ -363,6 +336,39 @@ function ActivitiesPage() {
                         className={`px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 truncate ${manualSelectedProject === project.id ? 'bg-gray-100 text-gray-900' : 'text-gray-700'}`}
                       >
                         {project.title}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Task Selector */}
+              <div ref={manualTaskDropdown.ref} className="relative">
+                <button
+                  onClick={() => manualTaskDropdown.setIsOpen(!manualTaskDropdown.isOpen)}
+                  className="flex items-center gap-1 px-3 py-1.5 text-sm rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+                >
+                  {manualSelectedTask ? getTaskTitle(manualSelectedTask) : 'No Task'}
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+                {manualTaskDropdown.isOpen && (
+                  <div className="absolute top-full left-0 mt-2 w-48 bg-white rounded-lg border border-gray-200 shadow-lg z-10 max-h-48 overflow-y-auto">
+                    <div
+                      onClick={() => { setManualSelectedTask(null); manualTaskDropdown.setIsOpen(false) }}
+                      className={`px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 ${!manualSelectedTask ? 'bg-gray-100 text-gray-900' : 'text-gray-700'}`}
+                    >
+                      No Task
+                    </div>
+                    {tasks
+                      .filter(task => (task.status === 'todo' || task.status === 'in_progress'))
+                      .filter(task => (!manualSelectedProject || task.project_id === manualSelectedProject))
+                      .map(task => (
+                      <div
+                        key={task.id}
+                        onClick={() => { setManualSelectedTask(task.id); manualTaskDropdown.setIsOpen(false) }}
+                        className={`px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 truncate ${manualSelectedTask === task.id ? 'bg-gray-100 text-gray-900' : 'text-gray-700'}`}
+                      >
+                        {task.title}
                       </div>
                     ))}
                   </div>
