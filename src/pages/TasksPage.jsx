@@ -295,7 +295,7 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
   ]
 
   return (
-    <div className="h-full bg-gray-60 flex gap-4 p-4">
+    <div className="h-full bg-gray-60 flex flex-row-reverse gap-4 p-4">
       {/* Right Sidebar - Controls */}
       <div className="w-64 flex flex-col overflow-hidden">
         <div className="h-full bg-white rounded-2xl border border-gray-200 flex flex-col p-4 gap-4 overflow-hidden">

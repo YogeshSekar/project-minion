@@ -3,9 +3,9 @@ import { Home, CheckSquare, Folder, Users, FileText, Target, TrendingUp, Chevron
 const menuItems = [
   { id: 'home', label: 'Dashboard', icon: Home },
   { id: 'tasks', label: 'My Task', icon: CheckSquare },
-  { id: 'activities', label: 'Activity', icon: Timer },
   { id: 'meetings', label: 'Chats', icon: Users },
   { id: 'notes', label: 'Documents', icon: FileText },
+  { id: 'activities', label: 'Activity', icon: Timer },
   { id: 'habits', label: 'Receipts', icon: Target },
   { id: 'projects', label: 'Projects', icon: Folder },
 ]
