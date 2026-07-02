@@ -171,6 +171,8 @@ export function getTaskStatusBadge(status) {
       return 'bg-green-50 text-green-600 border-green-200'
     case 'in_progress':
       return 'bg-yellow-50 text-yellow-600 border-yellow-200'
+    case 'waiting':
+      return 'bg-purple-50 text-purple-600 border-purple-200'
     case 'todo':
       return 'bg-blue-50 text-blue-600 border-blue-200'
     default:
@@ -184,6 +186,8 @@ export function getTaskStatusLabel(status) {
       return 'To Do'
     case 'in_progress':
       return 'In Progress'
+    case 'waiting':
+      return 'Waiting'
     case 'completed':
       return 'Completed'
     default:

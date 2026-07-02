@@ -192,7 +192,7 @@ function TaskSidePanel({
       } else {
         // Update task with shared payload builder
         const taskPayload = {
-          id: task.task_id || task.id,
+          id: task.id,
           ...buildTaskPayload(),
           checklist: checklist,
         }
@@ -242,12 +242,13 @@ function TaskSidePanel({
     switch (status) {
       case 'completed': return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
       case 'in_progress': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+      case 'waiting': return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
       default: return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400'
     }
   }
 
   const getStatusLabel = (status) => {
-    const labels = { pending: 'To Do', in_progress: 'In Progress', completed: 'Done' }
+    const labels = { todo: 'To Do', pending: 'To Do', in_progress: 'In Progress', waiting: 'Waiting', completed: 'Done' }
     return labels[status] || 'To Do'
   }
 
@@ -648,17 +649,19 @@ function TaskSidePanel({
                         <span className={`w-1.5 h-1.5 rounded-full ${
                           formData.status === 'todo' ? 'bg-blue-500' :
                           formData.status === 'in_progress' ? 'bg-yellow-500' :
+                          formData.status === 'waiting' ? 'bg-purple-500' :
                           'bg-green-500'
                         }`}></span>
                         {getStatusLabel(formData.status)}
                       </button>
                     }
                     align="right"
-                    className="w-[140px]"
+                    className="w-[160px]"
                   >
                     {[
                       { value: 'todo', label: 'To Do', color: 'bg-blue-500', bgColor: 'bg-blue-50 text-blue-600' },
                       { value: 'in_progress', label: 'In Progress', color: 'bg-yellow-500', bgColor: 'bg-yellow-50 text-yellow-600' },
+                      { value: 'waiting', label: 'Waiting', color: 'bg-purple-500', bgColor: 'bg-purple-50 text-purple-600' },
                       { value: 'completed', label: 'Done', color: 'bg-green-500', bgColor: 'bg-green-50 text-green-600' }
                     ].map((status) => (
                       <button

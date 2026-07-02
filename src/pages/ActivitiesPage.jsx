@@ -17,6 +17,7 @@ import useTasks from '../hooks/useTasks'
 import useProjects from '../hooks/useProjects'
 import useClickOutside from '../hooks/useClickOutside'
 import ConfirmModal from '../components/ConfirmModal'
+import GroupedActivityCard from '../components/GroupedActivityCard'
 
 function ActivitiesPage() {
   const {
@@ -91,6 +92,26 @@ function ActivitiesPage() {
   const getProjectTitle = (id) => {
     const project = projects.find(p => p.id === id)
     return project ? project.title : 'Unknown Project'
+  }
+
+  const groupActivities = (list) => {
+    const map = new Map()
+    list.forEach(a => {
+      const key = a.reference_type === 'task' && a.reference_id ? `task:${a.reference_id}` : (a.project_id ? `project:${a.project_id}` : 'no_group')
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          task_id: a.reference_type === 'task' ? a.reference_id : null,
+          project_id: a.project_id || null,
+          activities: []
+        })
+      }
+      map.get(key).activities.push(a)
+    })
+    return Array.from(map.values()).map(g => ({
+      ...g,
+      totalMinutes: g.activities.reduce((s, it) => s + (it.duration_minutes || 0), 0)
+    }))
   }
 
   const onQuickStart = async () => {
@@ -254,7 +275,7 @@ function ActivitiesPage() {
                     No Task
                   </div>
                   {tasks
-                    .filter(task => task.status === 'todo' || task.status === 'in_progress')
+                    .filter(task => task.status === 'todo' || task.status === 'in_progress' || task.status === 'waiting')
                     .filter(task => !quickSelectedProject || task.project_id === quickSelectedProject)
                     .map(task => (
                     <div
@@ -360,7 +381,7 @@ function ActivitiesPage() {
                       No Task
                     </div>
                     {tasks
-                      .filter(task => (task.status === 'todo' || task.status === 'in_progress'))
+                      .filter(task => (task.status === 'todo' || task.status === 'in_progress' || task.status === 'waiting'))
                       .filter(task => (!manualSelectedProject || task.project_id === manualSelectedProject))
                       .map(task => (
                       <div
@@ -409,7 +430,7 @@ function ActivitiesPage() {
           </div>
         </div>
 
-        {/* Recent Activities */}
+        {/* Recent Activities (grouped) */}
         <div className="bg-white rounded-2xl border border-gray-200 p-4">
           <div className="flex items-center gap-2 mb-4">
             <Clock3 className="w-4 h-4 text-gray-600" />
@@ -421,75 +442,20 @@ function ActivitiesPage() {
           ) : error ? (
             <div className="text-sm text-red-500 py-4 text-center">{error}</div>
           ) : (
-            <div className="space-y-2">
-              {activities.slice(0, 15).map((activity) => (
-                <div
-                  key={activity.id}
-                  className="bg-white rounded-2xl border border-gray-200 p-3 hover:shadow-sm transition-all"
-                >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-medium text-gray-900 truncate">{activity.title}</h3>
-                      <div className="flex items-center gap-2 mt-1 flex-wrap">
-                        {activity.reference_id && activity.reference_type === 'task' && (
-                          <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded-full">
-                            {getTaskTitle(activity.reference_id)}
-                          </span>
-                        )}
-                        {activity.project_id && (
-                          <span className="px-2 py-0.5 text-xs bg-gray-100 text-gray-600 rounded-full">
-                            {getProjectTitle(activity.project_id)}
-                          </span>
-                        )}
-                        <span className={`px-2 py-0.5 text-xs rounded-full ${
-                          activity.status === 'running'
-                            ? 'bg-green-50 text-green-600 border border-green-200'
-                            : 'bg-gray-50 text-gray-600 border border-gray-200'
-                        }`}>
-                          {activity.status}
-                        </span>
-                        <span className="px-2 py-0.5 text-xs text-gray-500">
-                          {activity.source}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
-                        <span className="flex items-center gap-1">
-                          <CalendarDays className="w-3 h-3" />
-                          {formatDateTime(activity.start_time)}
-                        </span>
-                        {activity.end_time && (
-                          <span className="flex items-center gap-1">
-                            <TimerReset className="w-3 h-3" />
-                            {formatDateTime(activity.end_time)}
-                          </span>
-                        )}
-                        <span className="flex items-center gap-1">
-                          <Clock3 className="w-3 h-3" />
-                          {formatDuration(activity.duration_minutes)}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1 ml-2">
-                      <button
-                        onClick={() => openEditModal(activity)}
-                        className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-                        title="Edit"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => openDeleteConfirm(activity)}
-                        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Delete"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {activities.length === 0 && (
+            <div className="space-y-3">
+              {activities.length === 0 ? (
                 <div className="text-sm text-gray-500 py-4 text-center">No activities recorded yet</div>
+              ) : (
+                groupActivities(activities).map(group => (
+                  <GroupedActivityCard
+                    key={group.key}
+                    group={group}
+                    getTaskTitle={getTaskTitle}
+                    getProjectTitle={getProjectTitle}
+                    openEditModal={openEditModal}
+                    openDeleteConfirm={openDeleteConfirm}
+                  />
+                ))
               )}
             </div>
           )}

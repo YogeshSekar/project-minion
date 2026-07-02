@@ -287,7 +287,7 @@ function ProjectsPage({ runningActivity: propRunningActivity, onActivityStarted,
         activity_type: 'focus_session',
         source: 'manual',
         reference_type: 'task',
-        reference_id: task.task_id,
+        reference_id: task.id,
         project_id: task.project_id
       })
       if (response.success) {

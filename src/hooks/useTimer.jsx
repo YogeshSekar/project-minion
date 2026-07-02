@@ -40,9 +40,9 @@ function useTimer() {
         // If there's a running activity linked to a task, sync the timer
         if (activity.reference_type === 'task' && activity.reference_id) {
           // Load task details
-          const tasksResponse = await invoke('get_all_task_views')
+          const tasksResponse = await invoke('get_all_tasks')
           if (tasksResponse.success) {
-            const task = tasksResponse.data.find(t => t.task_id === activity.reference_id)
+            const task = tasksResponse.data.find(t => t.id === activity.reference_id)
             if (task) {
               setTrackedTask(task)
               setIsTimerRunning(true)
@@ -87,7 +87,7 @@ function useTimer() {
             activity_type: 'focus_session',
             source: 'manual',
             reference_type: 'task',
-            reference_id: task.task_id,
+            reference_id: task.id,
             project_id: task.project_id
           })
           if (response.success) {

@@ -121,38 +121,48 @@ function useCustomDragDrop(onDrop) {
 }
 
 
-function BoardColumn({ title, columnId, tasks, projects, isDropTarget, onMouseEnter, onMouseLeave, draggingId, onEdit, onDelete, onComplete, onStart, onAddToToday, onTaskMouseDown }) {
+const columnAccentMap = {
+  todo: 'bg-sky-200',
+  in_progress: 'bg-amber-200',
+  waiting: 'bg-violet-200',
+  completed: 'bg-emerald-200',
+  backlog: 'bg-slate-300',
+  default: 'bg-slate-300',
+};
+
+function BoardColumn({ title, columnId, tasks, projects, isDropTarget, onMouseEnter, onMouseLeave, draggingId, onEdit, onDelete, onComplete, onStart, onAddToToday, onTaskMouseDown, onStartActivity, onStopActivity, runningActivity }) {
+  const accentClass = columnAccentMap[columnId] ?? columnAccentMap.default;
+
   return (
     <div
       data-column={columnId}
       onMouseEnter={() => onMouseEnter(columnId)}
       onMouseLeave={onMouseLeave}
       className={`
-        flex-1 min-w-[320px] max-w-[400px] flex flex-col rounded-2xl transition-all duration-200
+        flex min-w-[260px] w-full flex-col rounded-2xl border border-slate-200/80 bg-slate-50/80 transition-all duration-200 p-3 shadow-sm
         ${isDropTarget 
-          ? 'bg-red-50/30 dark:bg-red-900/10' 
-          : 'bg-transparent'
+          ? 'border-slate-300 bg-white' 
+          : ''
         }
       `}
     >
-      {/* Header */}
-      <div className="px-4 py-3 mb-3">
-        <h3 className="font-semibold text-gray-800 dark:text-white text-sm">
-          {title} 
-          <span className="ml-2 text-gray-500 dark:text-gray-400 font-normal">
-            ({tasks.length})
-          </span>
+      <div className="mb-3 flex items-center gap-2 border-b border-slate-200/70 pb-2">
+        <span className={`${accentClass} inline-block h-2.5 w-6 rounded-full`} />
+        <h3 className="text-sm font-semibold tracking-tight text-slate-900">
+          {title}
         </h3>
+        <span className="text-sm font-medium text-slate-500">
+          ({tasks.length})
+        </span>
       </div>
       
-      {/* Task List */}
-      <div className="flex-1 overflow-y-auto min-h-[300px] space-y-3 no-scrollbar">
+      <div className="flex-1 min-h-[220px] overflow-y-auto space-y-2.5  no-scrollbar">
         {tasks.length === 0 ? (
           <div className={`
-            h-32 flex items-center justify-center text-sm rounded-lg border-2 border-dashed
+            flex h-24 items-center justify-center rounded-xl border-2 border-dashed text-sm
             ${isDropTarget 
-              ? 'border-red-300 text-red-500 dark:border-red-600 dark:text-red-400' 
-              : 'border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500'
+              ? 'border-red-300 text-red-500' 
+              : 'border-gray-200 text-gray-400'
             }
           `}>
             Drop tasks here
@@ -169,6 +179,10 @@ function BoardColumn({ title, columnId, tasks, projects, isDropTarget, onMouseEn
               onAddToToday={onAddToToday}
               onMouseDown={onTaskMouseDown}
               isDragging={draggingId === task.id}
+              onStartActivity={onStartActivity}
+              onStopActivity={onStopActivity}
+              runningActivity={runningActivity}
+              hideStatus={true}
             />
           ))
         )}
@@ -194,7 +208,7 @@ const isOverdue = (dueDate) => {
   return due < today
 }
 
-export function BoardView({ tasks, projects, onUpdateTask, onDeleteTask, onEditTask, onAddToToday }) {
+export function BoardView({ tasks, projects, onUpdateTask, onDeleteTask, onEditTask, onAddToToday, onStartActivity, onStopActivity, runningActivity }) {
   const handleDrop = async (taskId, newStatus, taskData) => {
     const task = tasks.find(t => t.id === taskId);
     if (!task || task.status === newStatus) return;
@@ -212,6 +226,7 @@ export function BoardView({ tasks, projects, onUpdateTask, onDeleteTask, onEditT
 
   const todoTasks = tasks.filter(t => t.status === 'todo');
   const inProgressTasks = tasks.filter(t => t.status === 'in_progress');
+  const waitingTasks = tasks.filter(t => t.status === 'waiting');
   const doneTasks = tasks.filter(t => t.status === 'completed');
 
   const handleComplete = (task) => {
@@ -223,58 +238,87 @@ export function BoardView({ tasks, projects, onUpdateTask, onDeleteTask, onEditT
   };
 
   return (
-    <div className="h-full w-full flex gap-6 select-none">
-      <div className="flex-1 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 p-4 flex gap-6 overflow-hidden">
+    <div className="h-full w-full overflow-auto p-4 select-none">
+      <div className="flex h-full min-h-[420px] gap-3">
         <BoardColumn
-        title="To Do"
-        columnId="todo"
-        tasks={todoTasks}
-        projects={projects}
-        isDropTarget={dragOverColumn === 'todo'}
-        draggingId={draggingId}
-        onMouseEnter={handleColumnMouseEnter}
-        onMouseLeave={handleColumnMouseLeave}
-        onEdit={onEditTask}
-        onDelete={onDeleteTask}
-        onComplete={handleComplete}
-        onStart={handleStart}
-        onAddToToday={onAddToToday}
-        onTaskMouseDown={handleMouseDown}
-      />
+          title="To Do"
+          columnId="todo"
+          tasks={todoTasks}
+          projects={projects}
+          isDropTarget={dragOverColumn === 'todo'}
+          draggingId={draggingId}
+          onMouseEnter={handleColumnMouseEnter}
+          onMouseLeave={handleColumnMouseLeave}
+          onEdit={onEditTask}
+          onDelete={onDeleteTask}
+          onComplete={handleComplete}
+          onStart={handleStart}
+          onAddToToday={onAddToToday}
+          onTaskMouseDown={handleMouseDown}
+          onStartActivity={onStartActivity}
+          onStopActivity={onStopActivity}
+          runningActivity={runningActivity}
+        />
 
-      <BoardColumn
-        title="In Progress"
-        columnId="in_progress"
-        tasks={inProgressTasks}
-        projects={projects}
-        isDropTarget={dragOverColumn === 'in_progress'}
-        draggingId={draggingId}
-        onMouseEnter={handleColumnMouseEnter}
-        onMouseLeave={handleColumnMouseLeave}
-        onEdit={onEditTask}
-        onDelete={onDeleteTask}
-        onComplete={handleComplete}
-        onStart={handleStart}
-        onAddToToday={onAddToToday}
-        onTaskMouseDown={handleMouseDown}
-      />
+        <BoardColumn
+          title="In Progress"
+          columnId="in_progress"
+          tasks={inProgressTasks}
+          projects={projects}
+          isDropTarget={dragOverColumn === 'in_progress'}
+          draggingId={draggingId}
+          onMouseEnter={handleColumnMouseEnter}
+          onMouseLeave={handleColumnMouseLeave}
+          onEdit={onEditTask}
+          onDelete={onDeleteTask}
+          onComplete={handleComplete}
+          onStart={handleStart}
+          onAddToToday={onAddToToday}
+          onTaskMouseDown={handleMouseDown}
+          onStartActivity={onStartActivity}
+          onStopActivity={onStopActivity}
+          runningActivity={runningActivity}
+        />
 
-      <BoardColumn
-        title="Done"
-        columnId="completed"
-        tasks={doneTasks}
-        projects={projects}
-        isDropTarget={dragOverColumn === 'completed'}
-        draggingId={draggingId}
-        onMouseEnter={handleColumnMouseEnter}
-        onMouseLeave={handleColumnMouseLeave}
-        onEdit={onEditTask}
-        onDelete={onDeleteTask}
-        onComplete={handleComplete}
-        onStart={handleStart}
-        onAddToToday={onAddToToday}
-        onTaskMouseDown={handleMouseDown}
-      />
+        <BoardColumn
+          title="Waiting"
+          columnId="waiting"
+          tasks={waitingTasks}
+          projects={projects}
+          isDropTarget={dragOverColumn === 'waiting'}
+          draggingId={draggingId}
+          onMouseEnter={handleColumnMouseEnter}
+          onMouseLeave={handleColumnMouseLeave}
+          onEdit={onEditTask}
+          onDelete={onDeleteTask}
+          onComplete={handleComplete}
+          onStart={handleStart}
+          onAddToToday={onAddToToday}
+          onTaskMouseDown={handleMouseDown}
+          onStartActivity={onStartActivity}
+          onStopActivity={onStopActivity}
+          runningActivity={runningActivity}
+        />
+
+        <BoardColumn
+          title="Done"
+          columnId="completed"
+          tasks={doneTasks}
+          projects={projects}
+          isDropTarget={dragOverColumn === 'completed'}
+          draggingId={draggingId}
+          onMouseEnter={handleColumnMouseEnter}
+          onMouseLeave={handleColumnMouseLeave}
+          onEdit={onEditTask}
+          onDelete={onDeleteTask}
+          onComplete={handleComplete}
+          onStart={handleStart}
+          onAddToToday={onAddToToday}
+          onTaskMouseDown={handleMouseDown}
+          onStartActivity={onStartActivity}
+          onStopActivity={onStopActivity}
+          runningActivity={runningActivity}
+        />
       </div>
     </div>
   );

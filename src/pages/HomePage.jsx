@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react'
-import { ChevronLeft, ChevronRight, Calendar, Plus, AlertCircle, CheckCircle, List, LayoutGrid, Filter, ArrowUpDown, Circle, CheckSquare, Square, Video, Play, Clock, Hash, FileText, X, Trash2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Calendar, Plus, AlertCircle, CheckCircle, List, LayoutGrid, Filter, ArrowUpDown, Circle, CheckSquare, Square, Video, Play, Clock, Hash, FileText, X, Trash2, Copy } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
 import HorizontalTimeline from '../components/HorizontalTimeline'
 import TaskCard from '../components/TaskCard'
+import TipTapEditor from '../components/TipTapEditor'
 import { startActivity, stopCurrentActivity } from '../services/activityService'
 import { getRunningActivity } from '../services/api'
+import { getNotes, createNote as createNoteService, updateNote as updateNoteService, deleteNote as deleteNoteService } from '../services/noteService'
 import useTasks from '../hooks/useTasks'
 import useProjects from '../hooks/useProjects'
 import { formatDateLabel, getWeekDays } from '../utils/helpers'
@@ -13,6 +15,9 @@ function HomePage({ openTaskModal, taskRefreshTrigger = 0, onActivityStarted, on
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [quickNotes, setQuickNotes] = useState([])
   const [newNote, setNewNote] = useState('')
+  const [copyMessage, setCopyMessage] = useState('')
+  const [selectedQuickNote, setSelectedQuickNote] = useState(null)
+  const [selectedQuickNoteContent, setSelectedQuickNoteContent] = useState('')
 
   // Use hooks for data management
   const { tasks, loading: tasksLoading, updateTask, deleteTask, loadTasks } = useTasks()
@@ -52,7 +57,7 @@ function HomePage({ openTaskModal, taskRefreshTrigger = 0, onActivityStarted, on
         activity_type: 'focus_session',
         source: 'manual',
         reference_type: 'task',
-        reference_id: task.task_id,
+        reference_id: task.id,
         project_id: task.project_id
       })
       if (response.success) {
@@ -131,19 +136,155 @@ function HomePage({ openTaskModal, taskRefreshTrigger = 0, onActivityStarted, on
     await deleteTask(taskId)
   }
 
-  const handleAddNote = () => {
+  const handleAddNote = async () => {
     if (!newNote.trim()) return
-    const note = {
-      id: Date.now(),
-      text: newNote.trim(),
-      created_at: new Date().toISOString()
+    const content = newNote.trim()
+    const title = content.split('\n')[0] || 'Quick Note'
+    const today = new Date().toISOString().split('T')[0]
+
+    try {
+      const response = await createNoteService({
+        title,
+        content,
+        project_id: null,
+        note_type: 'quick',
+        created_date: today
+      })
+
+      if (response.success) {
+        setNewNote('')
+        await loadQuickNotes()
+      } else {
+        console.error('Error creating quick note:', response.error)
+      }
+    } catch (error) {
+      console.error('Error creating quick note:', error)
     }
-    setQuickNotes([note, ...quickNotes])
-    setNewNote('')
   }
 
-  const handleDeleteNote = (id) => {
-    setQuickNotes(quickNotes.filter(note => note.id !== id))
+  const handleDeleteNote = async (id) => {
+    try {
+      const response = await deleteNoteService(id)
+      if (response.success) {
+        setQuickNotes((currentNotes) => currentNotes.filter((note) => note.id !== id))
+        if (selectedQuickNote?.id === id) {
+          setSelectedQuickNote(null)
+        }
+      } else {
+        console.error('Error deleting quick note:', response.error)
+      }
+    } catch (error) {
+      console.error('Error deleting quick note:', error)
+    }
+  }
+
+  const loadQuickNotes = async () => {
+    try {
+      const response = await getNotes()
+      if (response.success) {
+        const quickNotesResponse = response.data?.filter((note) => note.note_type === 'quick') || []
+        setQuickNotes(quickNotesResponse)
+      }
+    } catch (error) {
+      console.error('Error loading quick notes:', error)
+    }
+  }
+
+  const getPlainTextFromHTML = (html = '') => {
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(html, 'text/html')
+    return doc.body.textContent || ''
+  }
+
+  const getFirstLineFromHTML = (html = '') => {
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(html, 'text/html')
+    const blockTags = new Set(['P', 'DIV', 'LI', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6'])
+
+    for (const node of Array.from(doc.body.childNodes)) {
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const element = node
+        if (blockTags.has(element.tagName)) {
+          return element.textContent.trim() || ''
+        }
+        if (element.tagName === 'BR') {
+          continue
+        }
+      }
+      if (node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent?.trim()
+        if (text) {
+          return text.split(/\r?\n/)[0].trim()
+        }
+      }
+    }
+
+    return (doc.body.textContent || '').trim().split(/\r?\n/).map((line) => line.trim()).filter(Boolean)[0] || ''
+  }
+
+  useEffect(() => {
+    loadQuickNotes()
+  }, [])
+
+  const handleCopyNote = async (text) => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text)
+      } else {
+        const textarea = document.createElement('textarea')
+        textarea.value = text
+        textarea.setAttribute('readonly', '')
+        textarea.style.position = 'absolute'
+        textarea.style.left = '-9999px'
+        document.body.appendChild(textarea)
+        textarea.select()
+        document.execCommand('copy')
+        document.body.removeChild(textarea)
+      }
+      setCopyMessage('Copied to clipboard')
+      window.setTimeout(() => setCopyMessage(''), 2500)
+    } catch (error) {
+      console.error('Failed to copy note text:', error)
+      setCopyMessage('Copy failed')
+      window.setTimeout(() => setCopyMessage(''), 2500)
+    }
+  }
+
+  const handleOpenQuickNote = (note) => {
+    setSelectedQuickNote(note)
+    setSelectedQuickNoteContent(note.content || '')
+  }
+
+  const handleCloseQuickNote = () => {
+    setSelectedQuickNote(null)
+    setSelectedQuickNoteContent('')
+  }
+
+  const handleSaveQuickNote = async () => {
+    if (!selectedQuickNote) return
+
+    const updatedContent = selectedQuickNoteContent.trim()
+    const updatedTitle = getFirstLineFromHTML(updatedContent) || 'Quick Note'
+
+    try {
+      const response = await updateNoteService({
+        id: selectedQuickNote.id,
+        title: updatedTitle,
+        content: updatedContent,
+        project_id: null,
+        note_type: 'quick'
+      })
+
+      if (response.success) {
+        await loadQuickNotes()
+        setSelectedQuickNote(response.data)
+        setSelectedQuickNoteContent(response.data.content || '')
+      } else {
+        console.error('Error updating quick note:', response.error)
+      }
+    } catch (error) {
+      console.error('Error updating quick note:', error)
+    }
   }
 
   const handleTimelineTaskClick = (task) => {
@@ -353,11 +494,18 @@ function HomePage({ openTaskModal, taskRefreshTrigger = 0, onActivityStarted, on
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <FileText className="w-5 h-5 text-gray-600" />
-                  <h3 className="font-semibold text-gray-900">Quick Notes</h3>
+                  <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                    <span>Quick Notes</span>
+                    <span className="text-sm font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                      {quickNotes.length}
+                    </span>
+                  </h3>
                 </div>
-                <span className="text-sm font-medium text-gray-500">
-                  {quickNotes.length}
-                </span>
+                <div className="flex items-center gap-3 min-h-[24px]">
+                  <span className={`text-sm text-green-600 bg-green-50 px-2 py-1 rounded-full transition-opacity duration-200 ${copyMessage ? 'opacity-100' : 'opacity-0 invisible'}`} aria-live="polite">
+                    {copyMessage || 'Copied'}
+                  </span>
+                </div>
               </div>
               <div className="flex gap-2 mb-4">
                 <input
@@ -380,19 +528,30 @@ function HomePage({ openTaskModal, taskRefreshTrigger = 0, onActivityStarted, on
                   quickNotes.map((note) => (
                     <div
                       key={note.id}
-                      className="bg-gray-50 rounded-xl p-3 border border-gray-200 group"
+                      onClick={() => handleOpenQuickNote(note)}
+                      className="bg-white rounded-xl p-3 border border-gray-200 shadow-sm group cursor-pointer transition hover:bg-gray-50"
                     >
-                      <p className="text-sm text-gray-900 mb-2">{note.text}</p>
-                      <div className="flex items-center justify-between">
+                      <p className="text-sm font-medium text-gray-900 mb-2 line-clamp-1">{getFirstLineFromHTML(note.content)}</p>
+                      <div className="flex items-center justify-between gap-2">
                         <span className="text-xs text-gray-500">
                           {new Date(note.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
-                        <button
-                          onClick={() => handleDeleteNote(note.id)}
-                          className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-gray-900 transition-all"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleCopyNote(getPlainTextFromHTML(note.content)) }}
+                            className="text-gray-400 hover:text-gray-900 transition-colors"
+                            aria-label="Copy quick note"
+                          >
+                            <Copy className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleDeleteNote(note.id) }}
+                            className="text-gray-400 hover:text-gray-900 transition-colors"
+                            aria-label="Delete quick note"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))
@@ -404,6 +563,49 @@ function HomePage({ openTaskModal, taskRefreshTrigger = 0, onActivityStarted, on
                 )}
               </div>
             </div>
+
+            {selectedQuickNote && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+                <div className="w-full max-w-2xl rounded-3xl bg-white p-6 shadow-2xl">
+                  <div className="flex items-center justify-between gap-4 pb-4 border-b border-gray-200">
+                    <p className="text-sm text-gray-500">Note created on {new Date(selectedQuickNote.created_at).toLocaleString()}</p>
+                    <button
+                      onClick={handleCloseQuickNote}
+                      className="rounded-full border border-gray-200 p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
+                      aria-label="Close quick note"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="mt-5 h-[360px]">
+                    <TipTapEditor
+                      content={selectedQuickNoteContent}
+                      onChange={setSelectedQuickNoteContent}
+                      onSave={handleSaveQuickNote}
+                    />
+                  </div>
+                  <div className="mt-4 flex flex-wrap items-center gap-2">
+                    <button
+                      onClick={() => handleCopyNote(getPlainTextFromHTML(selectedQuickNoteContent))}
+                      className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      <Copy className="w-4 h-4" />
+                      Copy
+                    </button>
+                    <button
+                      onClick={() => {
+                        handleDeleteNote(selectedQuickNote.id)
+                        handleCloseQuickNote()
+                      }}
+                      className="inline-flex items-center gap-2 rounded-full border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 hover:bg-red-100"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Horizontal Timeline */}
             <div className="bg-white rounded-2xl border border-gray-200 p-4">
