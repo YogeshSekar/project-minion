@@ -14,6 +14,7 @@ pub struct Task {
     pub is_recurring: i32,
     pub recurrence_type: Option<String>,
     pub recurrence_interval: Option<i32>,
+    pub meeting_id: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -30,6 +31,7 @@ pub struct CreateTaskRequest {
     pub is_recurring: Option<i32>,
     pub recurrence_type: Option<String>,
     pub recurrence_interval: Option<i32>,
+    pub meeting_id: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -45,4 +47,5 @@ pub struct UpdateTaskRequest {
     pub is_recurring: Option<i32>,
     pub recurrence_type: Option<String>,
     pub recurrence_interval: Option<i32>,
+    pub meeting_id: Option<String>,
 }

@@ -9,6 +9,7 @@ pub struct Note {
     pub created_date: String,
     pub project_id: Option<i64>,
     pub note_type: String,
+    pub meeting_id: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -20,6 +21,7 @@ pub struct CreateNoteRequest {
     pub project_id: Option<i64>,
     pub note_type: String,
     pub created_date: String,
+    pub meeting_id: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -29,4 +31,5 @@ pub struct UpdateNoteRequest {
     pub content: String,
     pub project_id: Option<i64>,
     pub note_type: String,
+    pub meeting_id: Option<String>,
 }

@@ -520,7 +520,7 @@ function NotesPage() {
                             </svg>
                           </button>
                           {projectDropdown.isOpen && (
-                            <div className="absolute left-0 top-full mt-2 w-48 rounded-xl border border-gray-200 bg-white shadow-lg">
+                            <div className="absolute left-0 top-full z-50 mt-2 w-48 rounded-xl border border-gray-200 bg-white shadow-lg">
                               <button
                                 onClick={() => {
                                   setEditedProjectId(null)
@@ -615,7 +615,7 @@ function NotesPage() {
                   }`}>
                     {selectedNote.note_type === 'meeting' ? 'Meeting' : 'General'}
                   </span>
-                  <div className="relative" ref={projectDropdown.ref}>
+                  <div className="relative z-50 z-50" ref={projectDropdown.ref}>
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
@@ -632,7 +632,7 @@ function NotesPage() {
                       </svg>
                     </button>
                     {projectDropdown.isOpen && (
-                      <div className="absolute left-0 top-full mt-2 w-48 rounded-xl border border-gray-200 bg-white shadow-lg">
+                      <div className="absolute left-0 top-full z-50 mt-2 w-48 rounded-xl border border-gray-200 bg-white shadow-lg">
                         <button
                           onClick={() => {
                             setEditedProjectId(null)

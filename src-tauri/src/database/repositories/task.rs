@@ -7,8 +7,8 @@ pub async fn create_task(
 ) -> Result<Task, sqlx::Error> {
     let task = sqlx::query_as::<_, Task>(
         r#"
-        INSERT INTO tasks (title, description, status, priority, due_date, scheduled_date, project_id, is_recurring, recurrence_type, recurrence_interval)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+        INSERT INTO tasks (title, description, status, priority, due_date, scheduled_date, project_id, is_recurring, recurrence_type, recurrence_interval, meeting_id)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
         RETURNING *
         "#,
     )
@@ -22,6 +22,7 @@ pub async fn create_task(
     .bind(req.is_recurring.unwrap_or(0))
     .bind(&req.recurrence_type)
     .bind(req.recurrence_interval.unwrap_or(1))
+    .bind(&req.meeting_id)
     .fetch_one(pool)
     .await?;
 
@@ -41,8 +42,9 @@ pub async fn update_task(
         UPDATE tasks 
         SET title = ?1, description = ?2, status = ?3, priority = ?4, 
             due_date = ?5, scheduled_date = ?6, project_id = ?7, 
-            is_recurring = ?8, recurrence_type = ?9, recurrence_interval = ?10, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?11
+            is_recurring = ?8, recurrence_type = ?9, recurrence_interval = ?10,
+            meeting_id = ?11, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?12
         RETURNING *
         "#,
     )
@@ -56,6 +58,7 @@ pub async fn update_task(
     .bind(req.is_recurring.unwrap_or(0))
     .bind(&req.recurrence_type)
     .bind(req.recurrence_interval.unwrap_or(1))
+    .bind(&req.meeting_id)
     .bind(req.id)
     .fetch_one(pool)
     .await?;

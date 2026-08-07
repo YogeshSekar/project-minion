@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { ChevronLeft, ChevronRight, Calendar, Clock, MapPin, Users, Briefcase, Video, Edit3, Save, X, Plus, List, LayoutGrid, Filter, ArrowUpDown, MoreVertical, Star, Paperclip, Loader2, Check } from 'lucide-react'
 import useProjects from '../hooks/useProjects'
 import useClickOutside from '../hooks/useClickOutside'
+import MeetingView from '../components/MeetingView'
 
 // Date navigator helper functions
 const getWeekDays = (selectedDate) => {
@@ -42,6 +43,7 @@ function MeetingsPage() {
   const [meetingUrls, setMeetingUrls] = useState({})
   const [isEditingUrl, setIsEditingUrl] = useState(false)
   const [editedUrl, setEditedUrl] = useState('')
+  const [showMeetingView, setShowMeetingView] = useState(false)
 
   // Use hooks for data management
   const { projects, loading: projectsLoading } = useProjects()
@@ -153,20 +155,16 @@ function MeetingsPage() {
       return;
     }
     
-    // Save project selection to database using the new architecture
-    const success = await onUserUpdate(externalId, {
-      project_id: projectId
-    })
+    // Note: Project assignment is currently disabled due to database schema limitations
+    // The meetings table does not have a project_id column
+    console.warn('[handleProjectSelect] Project assignment is currently disabled');
+    projectDropdown.setIsOpen(false);
     
-    console.log('[handleProjectSelect] onUserUpdate result:', success);
-    
-    if (success) {
-      // Update local state for backward compatibility
-      setMeetingProjects(prev => ({
-        ...prev,
-        [externalId]: projectId
+    // Update local state only for backward compatibility (UI only)
+    setMeetingProjects(prev => ({
+      ...prev,
+      [externalId]: projectId
       }))
-    }
     
     projectDropdown.setIsOpen(false)
   }
@@ -421,7 +419,6 @@ function MeetingsPage() {
       db_id: dbRecord.id,
       db_meeting_url: dbRecord.meeting_url,
       meeting_type: dbRecord.meeting_type,
-      project_id: dbRecord.project_id,
     }
   }
 
@@ -497,8 +494,7 @@ function MeetingsPage() {
         const updateResponse = await invoke('update_meeting_url', {
           request: {
             outlook_id: externalId,
-            meeting_url: updatedFields.meeting_url,
-            project_id: updatedFields.project_id
+            meeting_url: updatedFields.meeting_url
           }
         })
         
@@ -509,8 +505,7 @@ function MeetingsPage() {
             ...selectedMeeting,
             ...updatedFields,
             db_id: dbResponse.data.id,
-            db_meeting_url: updatedFields.meeting_url || dbResponse.data.meeting_url,
-            project_id: updatedFields.project_id !== undefined ? updatedFields.project_id : dbResponse.data.project_id
+            db_meeting_url: updatedFields.meeting_url || dbResponse.data.meeting_url
           }
           
           setSelectedMeeting(updatedMeeting)
@@ -526,7 +521,7 @@ function MeetingsPage() {
         }
       } else {
         console.log('[onUserUpdate] Meeting not found in DB');
-        // Create new record if user has provided enrichment fields (project_id or meeting_url)
+        // Create new record if user has provided enrichment fields (meeting_url)
         const shouldCreate = hasRequiredFields(updatedFields);
         console.log('[onUserUpdate] Should create new meeting?', shouldCreate, 'fields:', updatedFields);
         
@@ -550,7 +545,6 @@ function MeetingsPage() {
             attendees: outlookMeeting.attendees ? JSON.stringify(outlookMeeting.attendees) : null,
             meeting_url: updatedFields.meeting_url || null,
             meeting_type: getMeetingType(outlookMeeting),
-            project_id: updatedFields.project_id || null,
             description: null
           }
           
@@ -566,8 +560,7 @@ function MeetingsPage() {
               ...selectedMeeting,
               ...updatedFields,
               db_id: response.data.id,
-              db_meeting_url: updatedFields.meeting_url,
-              project_id: updatedFields.project_id
+              db_meeting_url: updatedFields.meeting_url
             }
             
             setSelectedMeeting(updatedMeeting)
@@ -606,11 +599,10 @@ function MeetingsPage() {
 
   // Check if user has provided required enrichment fields
   const hasRequiredFields = (fields) => {
-    // Define what constitutes required enrichment - either URL or project assignment
+    // Define what constitutes required enrichment - only URL since project_id is not in DB schema
     const hasUrl = fields.meeting_url && fields.meeting_url.trim()
-    const hasProject = fields.project_id !== null && fields.project_id !== undefined
-    console.log('🔍 DEBUG: hasRequiredFields check:', { hasUrl, hasProject, fields })
-    return hasUrl || hasProject
+    console.log('🔍 DEBUG: hasRequiredFields check:', { hasUrl, fields })
+    return hasUrl
   }
 
   const handleSaveUrl = async () => {
@@ -844,6 +836,25 @@ function MeetingsPage() {
     }
   }
 
+  // Resolve project details for MeetingView
+  const resolvedProject = selectedMeeting?.externalId && meetingProjects[selectedMeeting.externalId]
+    ? projects.find(p => p.id === meetingProjects[selectedMeeting.externalId])
+    : null;
+
+  const meetingForView = selectedMeeting ? {
+    ...selectedMeeting,
+    project: resolvedProject ? { name: resolvedProject.title } : null,
+  } : null;
+
+  if (showMeetingView && meetingForView) {
+    return (
+      <MeetingView
+        meeting={meetingForView}
+        onClose={() => setShowMeetingView(false)}
+      />
+    );
+  }
+
   return (
     <div className="h-full bg-gray-60 flex gap-4 p-4">
       {/* Left Main Content */}
@@ -942,7 +953,7 @@ function MeetingsPage() {
                                     e.stopPropagation()
                                     await handleJoinMeeting(displayMeeting)
                                   }}
-                                  className="p-1.5 bg-gray-900 text-white rounded-2xl hover:bg-gray-700 transition-all flex-shrink-0 opacity-0 group-hover:opacity-100"
+                                  className="p-1.5 bg-todoist-red text-white rounded-2xl hover:bg-todoist-red-hover transition-all flex-shrink-0 opacity-0 group-hover:opacity-100"
                                 >
                                   <Video className="w-3 h-3" />
                                 </button>
@@ -998,7 +1009,7 @@ function MeetingsPage() {
                                       e.stopPropagation()
                                       await handleJoinMeeting(displayMeeting)
                                     }}
-                                    className="p-1.5 bg-gray-900 text-white rounded-2xl hover:bg-gray-700 transition-all flex-shrink-0 opacity-0 group-hover:opacity-100"
+                                    className="p-1.5 bg-todoist-red text-white rounded-2xl hover:bg-todoist-red-hover transition-all flex-shrink-0 opacity-0 group-hover:opacity-100"
                                   >
                                     <Video className="w-3 h-3" />
                                   </button>
@@ -1103,27 +1114,37 @@ function MeetingsPage() {
                       </div>
                     ) : (
                       <div className="flex items-center gap-2">
+                        {getMeetingUrl(selectedMeeting) && (
+                          <a
+                            href={getMeetingUrl(selectedMeeting)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={() => setShowMeetingView(true)}
+                            className="flex items-center gap-2 px-4 py-2 bg-todoist-red hover:bg-todoist-red-hover text-white text-sm font-medium rounded-full transition-colors"
+                          >
+                            <Video className="w-4 h-4" />
+                            Join
+                          </a>
+                        )}
+
+                        <button
+                          onClick={() => setShowMeetingView(true)}
+                          className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-100 text-gray-900 text-sm font-medium rounded-full border border-gray-200 transition-colors"
+                        >
+                          <List className="w-4 h-4" />
+                          Meeting View
+                        </button>
+
                         {getMeetingUrl(selectedMeeting) ? (
-                          <>
-                            <a
-                              href={getMeetingUrl(selectedMeeting)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-700 text-white text-sm font-medium rounded-full transition-colors"
+                          !hasLocationUrl(selectedMeeting) && (
+                            <button
+                              onClick={handleStartEditingUrl}
+                              className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                              title="Edit meeting link"
                             >
-                              <Video className="w-4 h-4" />
-                              Join
-                            </a>
-                            {!hasLocationUrl(selectedMeeting) && (
-                              <button
-                                onClick={handleStartEditingUrl}
-                                className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                                title="Edit meeting link"
-                              >
-                                <Edit3 className="w-3.5 h-3.5" />
-                              </button>
-                            )}
-                          </>
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                          )
                         ) : (
                           <button
                             onClick={handleStartEditingUrl}
@@ -1199,9 +1220,9 @@ function MeetingsPage() {
                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                         }`}
                       >
-                        <span className={`w-1.5 h-1.5 rounded-full ${selectedMeeting?.project_id ? 'bg-purple-500' : 'bg-gray-400'}`}></span>
-                        {selectedMeeting?.project_id && projects.find(p => p.id === selectedMeeting.project_id)
-                          ? projects.find(p => p.id === selectedMeeting.project_id)?.title
+                        <span className={`w-1.5 h-1.5 rounded-full ${selectedMeeting?.externalId && meetingProjects[selectedMeeting.externalId] ? 'bg-purple-500' : 'bg-gray-400'}`}></span>
+                        {selectedMeeting?.externalId && meetingProjects[selectedMeeting.externalId] && projects.find(p => p.id === meetingProjects[selectedMeeting.externalId])
+                          ? projects.find(p => p.id === meetingProjects[selectedMeeting.externalId])?.title
                           : 'No Project'}
                       </button>
                       {projectDropdown.isOpen && selectedMeeting && (
@@ -1209,7 +1230,7 @@ function MeetingsPage() {
                           <button
                             onClick={() => handleProjectSelect(null)}
                             className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 ${
-                              !selectedMeeting.project_id ? 'bg-gray-200 text-gray-900' : 'text-gray-700'
+                              !selectedMeeting?.externalId || !meetingProjects[selectedMeeting.externalId] ? 'bg-gray-200 text-gray-900' : 'text-gray-700'
                             }`}
                           >
                             No Project
@@ -1219,7 +1240,7 @@ function MeetingsPage() {
                               key={project.id}
                               onClick={() => handleProjectSelect(project.id)}
                               className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 ${
-                                selectedMeeting.project_id === project.id ? 'bg-gray-200 text-gray-900' : 'text-gray-700'
+                                selectedMeeting?.externalId && meetingProjects[selectedMeeting.externalId] === project.id ? 'bg-gray-200 text-gray-900' : 'text-gray-700'
                               }`}
                             >
                               {project.title}

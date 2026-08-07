@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { X, Clock, Star, MoreVertical, CheckSquare, Plus, Trash2, Calendar, CalendarDays, Timer, Target, Loader2, Check, User, FileText } from 'lucide-react'
 import Dropdown from './ui/Dropdown'
 import DateTimePicker from './DateTimePicker'
+import TipTapEditor from './TipTapEditor'
 
 function TaskSidePanel({ 
   isOpen, 
@@ -527,13 +528,15 @@ function TaskSidePanel({
       </h3>
     </div>
 
-    <textarea
-      value={formData.description}
-      onChange={(e) => handleChange('description', e.target.value)}
-      placeholder="Add detailed description..."
-      rows={10}
-      className="w-full px-3 py-2 text-sm text-gray-900 bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent resize-none"
-    />
+    <div className="w-full h-40 border border-gray-200 rounded-lg overflow-hidden">
+      <TipTapEditor
+        content={formData.description}
+        onChange={(content) => handleChange('description', content)}
+        editable={true}
+        showToolbar={false}
+        hideScrollbar={true}
+      />
+    </div>
   </div>
 
   {/* Checklist Section */}

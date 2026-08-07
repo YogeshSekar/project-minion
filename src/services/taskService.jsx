@@ -109,3 +109,16 @@ export async function getTasksDueToday() {
     return { success: false, data: null, error: error.toString() }
   }
 }
+
+export async function getTasksByMeeting(meetingId) {
+  try {
+    const response = await getAllTasks()
+    if (response.success && response.data) {
+      const meetingTasks = response.data.filter(task => task.meeting_id === meetingId)
+      return { success: true, data: meetingTasks, error: null }
+    }
+    return response
+  } catch (error) {
+    return { success: false, data: null, error: error.toString() }
+  }
+}

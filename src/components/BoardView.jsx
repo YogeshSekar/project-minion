@@ -122,16 +122,26 @@ function useCustomDragDrop(onDrop) {
 
 
 const columnAccentMap = {
-  todo: 'bg-sky-200',
-  in_progress: 'bg-amber-200',
-  waiting: 'bg-violet-200',
-  completed: 'bg-emerald-200',
-  backlog: 'bg-slate-300',
-  default: 'bg-slate-300',
+  todo: 'bg-sky-50',
+  in_progress: 'bg-amber-50',
+  waiting: 'bg-violet-50',
+  completed: 'bg-emerald-50',
+  backlog: 'bg-slate-50',
+  default: 'bg-slate-50',
+};
+
+const columnIconColorMap = {
+  todo: 'bg-sky-500',
+  in_progress: 'bg-amber-500',
+  waiting: 'bg-violet-500',
+  completed: 'bg-emerald-500',
+  backlog: 'bg-slate-400',
+  default: 'bg-slate-400',
 };
 
 function BoardColumn({ title, columnId, tasks, projects, isDropTarget, onMouseEnter, onMouseLeave, draggingId, onEdit, onDelete, onComplete, onStart, onAddToToday, onTaskMouseDown, onStartActivity, onStopActivity, runningActivity }) {
   const accentClass = columnAccentMap[columnId] ?? columnAccentMap.default;
+  const iconColorClass = columnIconColorMap[columnId] ?? columnIconColorMap.default;
 
   return (
     <div
@@ -139,15 +149,15 @@ function BoardColumn({ title, columnId, tasks, projects, isDropTarget, onMouseEn
       onMouseEnter={() => onMouseEnter(columnId)}
       onMouseLeave={onMouseLeave}
       className={`
-        flex min-w-[260px] w-full flex-col rounded-2xl border border-slate-200/80 bg-slate-50/80 transition-all duration-200 p-3 shadow-sm
-        ${isDropTarget 
-          ? 'border-slate-300 bg-white' 
+        flex min-w-[260px] w-full flex-col rounded-2xl border border-slate-200/80 ${accentClass} transition-all duration-200 p-3 shadow-sm
+        ${isDropTarget
+          ? 'border-slate-300 bg-white'
           : ''
         }
       `}
     >
       <div className="mb-3 flex items-center gap-2 border-b border-slate-200/70 pb-2">
-        <span className={`${accentClass} inline-block h-2.5 w-6 rounded-full`} />
+        <span className={`${iconColorClass} inline-block h-2.5 w-6 rounded-full`} />
         <h3 className="text-sm font-semibold tracking-tight text-slate-900">
           {title}
         </h3>
@@ -208,7 +218,7 @@ const isOverdue = (dueDate) => {
   return due < today
 }
 
-export function BoardView({ tasks, projects, onUpdateTask, onDeleteTask, onEditTask, onAddToToday, onStartActivity, onStopActivity, runningActivity }) {
+export function BoardView({ tasks, projects, onUpdateTask, onDeleteTask, onEditTask, onAddToToday, onStartActivity, onStopActivity, runningActivity, showDone = true }) {
   const handleDrop = async (taskId, newStatus, taskData) => {
     const task = tasks.find(t => t.id === taskId);
     if (!task || task.status === newStatus) return;
@@ -300,25 +310,27 @@ export function BoardView({ tasks, projects, onUpdateTask, onDeleteTask, onEditT
           runningActivity={runningActivity}
         />
 
-        <BoardColumn
-          title="Done"
-          columnId="completed"
-          tasks={doneTasks}
-          projects={projects}
-          isDropTarget={dragOverColumn === 'completed'}
-          draggingId={draggingId}
-          onMouseEnter={handleColumnMouseEnter}
-          onMouseLeave={handleColumnMouseLeave}
-          onEdit={onEditTask}
-          onDelete={onDeleteTask}
-          onComplete={handleComplete}
-          onStart={handleStart}
-          onAddToToday={onAddToToday}
-          onTaskMouseDown={handleMouseDown}
-          onStartActivity={onStartActivity}
-          onStopActivity={onStopActivity}
-          runningActivity={runningActivity}
-        />
+        {showDone && (
+          <BoardColumn
+            title="Done"
+            columnId="completed"
+            tasks={doneTasks}
+            projects={projects}
+            isDropTarget={dragOverColumn === 'completed'}
+            draggingId={draggingId}
+            onMouseEnter={handleColumnMouseEnter}
+            onMouseLeave={handleColumnMouseLeave}
+            onEdit={onEditTask}
+            onDelete={onDeleteTask}
+            onComplete={handleComplete}
+            onStart={handleStart}
+            onAddToToday={onAddToToday}
+            onTaskMouseDown={handleMouseDown}
+            onStartActivity={onStartActivity}
+            onStopActivity={onStopActivity}
+            runningActivity={runningActivity}
+          />
+        )}
       </div>
     </div>
   );

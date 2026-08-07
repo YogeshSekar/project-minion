@@ -1,6 +1,31 @@
-import { X } from 'lucide-react'
+import { X, Power } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { getAutoStart, setAutoStart } from '../services/autoStartService'
 
 export default function SettingsModal({ isOpen, onClose, theme, setTheme, font, setFont }) {
+  const [autoStart, setAutoStartState] = useState(false)
+  const [autoStartLoading, setAutoStartLoading] = useState(true)
+
+  useEffect(() => {
+    if (!isOpen) return
+    setAutoStartLoading(true)
+    getAutoStart()
+      .then(setAutoStartState)
+      .catch(() => {})
+      .finally(() => setAutoStartLoading(false))
+  }, [isOpen])
+
+  const handleAutoStartToggle = async () => {
+    const next = !autoStart
+    setAutoStartState(next)
+    try {
+      await setAutoStart(next)
+    } catch (e) {
+      console.error('Autostart toggle failed:', e)
+      setAutoStartState(autoStart) // revert on error
+    }
+  }
+
   if (!isOpen) return null
 
   const handleThemeChange = (value) => {
@@ -101,6 +126,42 @@ export default function SettingsModal({ isOpen, onClose, theme, setTheme, font, 
                 {f.name}
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* System Section */}
+        <div className="mb-6">
+          <h3 className="text-sm font-medium text-todoist-text-secondary mb-3">
+            System
+          </h3>
+          <div className="flex items-center justify-between py-2 px-3 rounded-lg bg-todoist-sidebar-bg border border-todoist-border">
+            <div className="flex items-center gap-2">
+              <Power className="w-4 h-4 text-todoist-text-secondary" />
+              <div>
+                <p className="text-sm font-medium text-todoist-text-primary">Start on login</p>
+                <p className="text-xs text-todoist-text-secondary">Launch Project Minion when Windows starts</p>
+              </div>
+            </div>
+            <button
+              id="settings-autostart-toggle"
+              onClick={handleAutoStartToggle}
+              disabled={autoStartLoading}
+              className={`
+                relative inline-flex h-6 w-11 flex-shrink-0 rounded-full border-2 border-transparent
+                transition-colors duration-200 ease-in-out
+                focus:outline-none
+                ${autoStartLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+                ${autoStart ? 'bg-gray-900' : 'bg-gray-300'}
+              `}
+            >
+              <span
+                className={`
+                  pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow
+                  transition duration-200 ease-in-out
+                  ${autoStart ? 'translate-x-5' : 'translate-x-0'}
+                `}
+              />
+            </button>
           </div>
         </div>
 

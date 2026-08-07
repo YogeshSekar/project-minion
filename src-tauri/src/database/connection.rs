@@ -61,6 +61,7 @@ async fn create_tables(pool: &Pool<Sqlite>) -> Result<(), sqlx::Error> {
             is_recurring INTEGER NOT NULL DEFAULT 0,
             recurrence_type TEXT,
             recurrence_interval INTEGER DEFAULT 1,
+            meeting_id TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
@@ -152,6 +153,7 @@ async fn create_tables(pool: &Pool<Sqlite>) -> Result<(), sqlx::Error> {
             created_date TEXT NOT NULL,
             project_id INTEGER,
             note_type TEXT NOT NULL DEFAULT 'general',
+            meeting_id TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
@@ -295,6 +297,25 @@ async fn create_tables(pool: &Pool<Sqlite>) -> Result<(), sqlx::Error> {
     )
     .execute(pool)
     .await?;
+
+    // Add migrations for meeting_id columns
+    sqlx::query(
+        r#"
+        ALTER TABLE tasks ADD COLUMN meeting_id TEXT
+        "#,
+    )
+    .execute(pool)
+    .await
+    .ok();
+
+    sqlx::query(
+        r#"
+        ALTER TABLE notes ADD COLUMN meeting_id TEXT
+        "#,
+    )
+    .execute(pool)
+    .await
+    .ok();
 
     Ok(())
 }

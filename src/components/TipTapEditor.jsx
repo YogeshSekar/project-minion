@@ -1,8 +1,31 @@
 import { useEditor, EditorContent } from '@tiptap/react'
+import { BubbleMenu } from '@tiptap/react/menus'
 import StarterKit from '@tiptap/starter-kit'
 import Link from '@tiptap/extension-link'
+import { Underline } from '@tiptap/extension-underline'
+import { Highlight } from '@tiptap/extension-highlight'
+import { Table } from '@tiptap/extension-table'
+import { TableRow } from '@tiptap/extension-table-row'
+import { TableCell } from '@tiptap/extension-table-cell'
+import { TableHeader } from '@tiptap/extension-table-header'
 import { Node, mergeAttributes } from '@tiptap/core'
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useState, useRef } from 'react'
+import { 
+  Bold, 
+  Italic, 
+  Underline as UnderlineIcon, 
+  Strikethrough, 
+  Highlighter, 
+  Link as LinkIcon,
+  Undo2,
+  Redo2,
+  List,
+  ListOrdered,
+  Quote,
+  Code,
+  ChevronDown,
+  Table as TableIcon
+} from 'lucide-react'
 
 // Custom Resizable Image Extension - replaces the default Image extension
 const ResizableImage = Node.create({
@@ -155,7 +178,7 @@ const ResizableImage = Node.create({
   },
 })
 
-function TipTapEditor({ content, onChange, editable = true, moveCursorToEnd = false, onSave }) {
+function TipTapEditor({ content, onChange, editable = true, moveCursorToEnd = false, onSave, showToolbar = true, hideScrollbar = false }) {
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -183,6 +206,16 @@ function TipTapEditor({ content, onChange, editable = true, moveCursorToEnd = fa
         openOnClick: false,
         linkOnPaste: true,
       }),
+      Underline,
+      Highlight.configure({
+        multicolor: true,
+      }),
+      Table.configure({
+        resizable: true,
+      }),
+      TableRow,
+      TableHeader,
+      TableCell,
     ],
     content: content || '<p></p>',
     editable,
@@ -205,6 +238,36 @@ function TipTapEditor({ content, onChange, editable = true, moveCursorToEnd = fa
       editor.chain().focus().setTextSelection(endPos).run()
     }
   }, [moveCursorToEnd, editor])
+
+  const [isStyleDropdownOpen, setIsStyleDropdownOpen] = useState(false)
+  const styleDropdownRef = useRef(null)
+  
+  const [isTableDropdownOpen, setIsTableDropdownOpen] = useState(false)
+  const tableDropdownRef = useRef(null)
+
+  // Close dropdowns on click outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (styleDropdownRef.current && !styleDropdownRef.current.contains(event.target)) {
+        setIsStyleDropdownOpen(false)
+      }
+      if (tableDropdownRef.current && !tableDropdownRef.current.contains(event.target)) {
+        setIsTableDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const getActiveStyleLabel = () => {
+    if (!editor) return 'Normal Text'
+    if (editor.isActive('heading', { level: 1 })) return 'Heading 1'
+    if (editor.isActive('heading', { level: 2 })) return 'Heading 2'
+    if (editor.isActive('heading', { level: 3 })) return 'Heading 3'
+    if (editor.isActive('blockquote')) return 'Quote'
+    if (editor.isActive('codeBlock')) return 'Code Block'
+    return 'Normal Text'
+  }
 
   if (!editor) {
     return null
@@ -289,66 +352,181 @@ function TipTapEditor({ content, onChange, editable = true, moveCursorToEnd = fa
   return (
     <div className="h-full flex flex-col">
       {/* Toolbar */}
-      <div className="flex-none px-4 py-2 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700 flex items-center gap-1 flex-wrap">
-        {/* Text Style */}
+      {showToolbar && (
+        <div className="flex-none px-4 py-2 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700 flex items-center gap-1 flex-wrap">
+        {/* History Controls */}
+        <button
+          onClick={() => editor.chain().focus().undo().run()}
+          disabled={!editor.can().undo()}
+          className="p-1.5 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          title="Undo"
+        >
+          <Undo2 className="w-4 h-4" />
+        </button>
+        <button
+          onClick={() => editor.chain().focus().redo().run()}
+          disabled={!editor.can().redo()}
+          className="p-1.5 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          title="Redo"
+        >
+          <Redo2 className="w-4 h-4" />
+        </button>
+
+        <div className="w-px h-5 bg-gray-300 dark:bg-gray-600 mx-1" />
+
+        {/* Text Style Dropdown */}
+        <div className="relative" ref={styleDropdownRef}>
+          <button
+            onClick={() => setIsStyleDropdownOpen(!isStyleDropdownOpen)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
+            title="Text Style"
+          >
+            <span>{getActiveStyleLabel()}</span>
+            <ChevronDown className="w-3.5 h-3.5 opacity-60" />
+          </button>
+
+          {isStyleDropdownOpen && (
+            <div className="absolute left-0 mt-1 w-44 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-50">
+              <button
+                onClick={() => {
+                  editor.chain().focus().setParagraph().run()
+                  setIsStyleDropdownOpen(false)
+                }}
+                className={`w-full text-left px-3 py-1.5 text-sm transition-colors ${
+                  editor.isActive('paragraph') && !editor.isActive('blockquote') && !editor.isActive('codeBlock')
+                    ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+              >
+                Normal Text
+              </button>
+              <button
+                onClick={() => {
+                  editor.chain().focus().toggleHeading({ level: 1 }).run()
+                  setIsStyleDropdownOpen(false)
+                }}
+                className={`w-full text-left px-3 py-1.5 text-sm font-bold transition-colors ${
+                  editor.isActive('heading', { level: 1 })
+                    ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+              >
+                Heading 1
+              </button>
+              <button
+                onClick={() => {
+                  editor.chain().focus().toggleHeading({ level: 2 }).run()
+                  setIsStyleDropdownOpen(false)
+                }}
+                className={`w-full text-left px-3 py-1.5 text-sm font-semibold transition-colors ${
+                  editor.isActive('heading', { level: 2 })
+                    ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+              >
+                Heading 2
+              </button>
+              <button
+                onClick={() => {
+                  editor.chain().focus().toggleHeading({ level: 3 }).run()
+                  setIsStyleDropdownOpen(false)
+                }}
+                className={`w-full text-left px-3 py-1.5 text-sm font-medium transition-colors ${
+                  editor.isActive('heading', { level: 3 })
+                    ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+              >
+                Heading 3
+              </button>
+              <div className="border-t border-gray-100 dark:border-gray-700 my-1" />
+              <button
+                onClick={() => {
+                  editor.chain().focus().toggleBlockquote().run()
+                  setIsStyleDropdownOpen(false)
+                }}
+                className={`w-full text-left px-3 py-1.5 text-sm italic transition-colors ${
+                  editor.isActive('blockquote')
+                    ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+              >
+                Blockquote
+              </button>
+              <button
+                onClick={() => {
+                  editor.chain().focus().toggleCodeBlock().run()
+                  setIsStyleDropdownOpen(false)
+                }}
+                className={`w-full text-left px-3 py-1.5 text-sm font-mono transition-colors ${
+                  editor.isActive('codeBlock')
+                    ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                    : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                }`}
+              >
+                Code Block
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="w-px h-5 bg-gray-300 dark:bg-gray-600 mx-1" />
+
+        {/* Text Styles */}
         <button
           onClick={() => editor.chain().focus().toggleBold().run()}
-          className={`px-3 py-1.5 text-sm font-bold rounded transition-colors ${
+          className={`p-1.5 rounded transition-colors ${
             editor.isActive('bold')
               ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300'
               : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
           }`}
           title="Bold"
         >
-          B
+          <Bold className="w-4 h-4" />
         </button>
         <button
           onClick={() => editor.chain().focus().toggleItalic().run()}
-          className={`px-3 py-1.5 text-sm italic rounded transition-colors ${
+          className={`p-1.5 rounded transition-colors ${
             editor.isActive('italic')
               ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300'
               : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
           }`}
           title="Italic"
         >
-          I
+          <Italic className="w-4 h-4" />
+        </button>
+        <button
+          onClick={() => editor.chain().focus().toggleUnderline().run()}
+          className={`p-1.5 rounded transition-colors ${
+            editor.isActive('underline')
+              ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300'
+              : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+          }`}
+          title="Underline"
+        >
+          <UnderlineIcon className="w-4 h-4" />
         </button>
         <button
           onClick={() => editor.chain().focus().toggleStrike().run()}
-          className={`px-3 py-1.5 text-sm line-through rounded transition-colors ${
+          className={`p-1.5 rounded transition-colors ${
             editor.isActive('strike')
               ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300'
               : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
           }`}
           title="Strikethrough"
         >
-          S
+          <Strikethrough className="w-4 h-4" />
         </button>
-
-        <div className="w-px h-5 bg-gray-300 dark:bg-gray-600 mx-1" />
-
-        {/* Headings */}
         <button
-          onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}
-          className={`px-3 py-1.5 text-sm font-bold rounded transition-colors ${
-            editor.isActive('heading', { level: 1 })
+          onClick={() => editor.chain().focus().toggleHighlight().run()}
+          className={`p-1.5 rounded transition-colors ${
+            editor.isActive('highlight')
               ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300'
               : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
           }`}
-          title="Heading 1"
+          title="Highlight"
         >
-          H1
-        </button>
-        <button
-          onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}
-          className={`px-3 py-1.5 text-sm font-bold rounded transition-colors ${
-            editor.isActive('heading', { level: 2 })
-              ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300'
-              : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
-          }`}
-          title="Heading 2"
-        >
-          H2
+          <Highlighter className="w-4 h-4" />
         </button>
 
         <div className="w-px h-5 bg-gray-300 dark:bg-gray-600 mx-1" />
@@ -363,9 +541,7 @@ function TipTapEditor({ content, onChange, editable = true, moveCursorToEnd = fa
           }`}
           title="Bullet List"
         >
-          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M4 10h1v4H4v-4zm2 0h10v4H6v-4zm12 0h1v4h-1v-4z"/>
-          </svg>
+          <List className="w-4 h-4" />
         </button>
         <button
           onClick={() => editor.chain().focus().toggleOrderedList().run()}
@@ -376,9 +552,7 @@ function TipTapEditor({ content, onChange, editable = true, moveCursorToEnd = fa
           }`}
           title="Numbered List"
         >
-          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M2 17h2v.5H3v1h1v.5H2v1h3v-4H2v1zm1-9h1V4H2v1h1v3zm-1 3h1.8L2 13.1v.9h3v-1H3.2L5 10.9V10H2v1zm5-6v2h14V5H7zm0 4h14v9H7v-2h14v-2H7V9z"/>
-          </svg>
+          <ListOrdered className="w-4 h-4" />
         </button>
 
         <div className="w-px h-5 bg-gray-300 dark:bg-gray-600 mx-1" />
@@ -393,9 +567,7 @@ function TipTapEditor({ content, onChange, editable = true, moveCursorToEnd = fa
           }`}
           title="Quote"
         >
-          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M6 17h3l2-4V7H7v6h4l-2 4zm8 0h3l2-4V7h-4v6h4l-2 4z"/>
-          </svg>
+          <Quote className="w-4 h-4" />
         </button>
         <button
           onClick={() => editor.chain().focus().toggleCodeBlock().run()}
@@ -406,9 +578,7 @@ function TipTapEditor({ content, onChange, editable = true, moveCursorToEnd = fa
           }`}
           title="Code Block"
         >
-          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0l4.6-4.6-4.6-4.6L16 6l6 6-6 6-1.4-1.4z"/>
-          </svg>
+          <Code className="w-4 h-4" />
         </button>
 
         <div className="w-px h-5 bg-gray-300 dark:bg-gray-600 mx-1" />
@@ -428,9 +598,7 @@ function TipTapEditor({ content, onChange, editable = true, moveCursorToEnd = fa
           }`}
           title="Add Link"
         >
-          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z"/>
-          </svg>
+          <LinkIcon className="w-4 h-4" />
         </button>
 
         {/* Image - File Upload */}
@@ -444,26 +612,259 @@ function TipTapEditor({ content, onChange, editable = true, moveCursorToEnd = fa
           </svg>
         </button>
 
+        {/* Table Operations */}
+        <div className="relative" ref={tableDropdownRef}>
+          <button
+            onClick={() => setIsTableDropdownOpen(!isTableDropdownOpen)}
+            className={`p-1.5 rounded transition-colors ${
+              editor.isActive('table')
+                ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300'
+                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+            }`}
+            title="Table Actions"
+          >
+            <TableIcon className="w-4 h-4" />
+          </button>
+
+          {isTableDropdownOpen && (
+            <div className="absolute right-0 mt-1 w-52 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-50">
+              {!editor.isActive('table') ? (
+                <button
+                  onClick={() => {
+                    editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
+                    setIsTableDropdownOpen(false)
+                  }}
+                  className="w-full text-left px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors flex items-center gap-2"
+                >
+                  <TableIcon className="w-4 h-4 opacity-60" />
+                  <span>Insert Table (3x3)</span>
+                </button>
+              ) : (
+                <>
+                  <div className="px-3 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                    Columns
+                  </div>
+                  <button
+                    onClick={() => {
+                      editor.chain().focus().addColumnBefore().run()
+                      setIsTableDropdownOpen(false)
+                    }}
+                    className="w-full text-left px-3 py-1 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    Add Column Left
+                  </button>
+                  <button
+                    onClick={() => {
+                      editor.chain().focus().addColumnAfter().run()
+                      setIsTableDropdownOpen(false)
+                    }}
+                    className="w-full text-left px-3 py-1 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    Add Column Right
+                  </button>
+                  <button
+                    onClick={() => {
+                      editor.chain().focus().deleteColumn().run()
+                      setIsTableDropdownOpen(false)
+                    }}
+                    className="w-full text-left px-3 py-1 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                  >
+                    Delete Column
+                  </button>
+
+                  <div className="border-t border-gray-100 dark:border-gray-700 my-1" />
+                  <div className="px-3 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                    Rows
+                  </div>
+                  <button
+                    onClick={() => {
+                      editor.chain().focus().addRowBefore().run()
+                      setIsTableDropdownOpen(false)
+                    }}
+                    className="w-full text-left px-3 py-1 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    Add Row Above
+                  </button>
+                  <button
+                    onClick={() => {
+                      editor.chain().focus().addRowAfter().run()
+                      setIsTableDropdownOpen(false)
+                    }}
+                    className="w-full text-left px-3 py-1 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    Add Row Below
+                  </button>
+                  <button
+                    onClick={() => {
+                      editor.chain().focus().deleteRow().run()
+                      setIsTableDropdownOpen(false)
+                    }}
+                    className="w-full text-left px-3 py-1 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                  >
+                    Delete Row
+                  </button>
+
+                  <div className="border-t border-gray-100 dark:border-gray-700 my-1" />
+                  <div className="px-3 py-1 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                    Merge / Split
+                  </div>
+                  <button
+                    onClick={() => {
+                      editor.chain().focus().mergeCells().run()
+                      setIsTableDropdownOpen(false)
+                    }}
+                    className="w-full text-left px-3 py-1 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    Merge Cells
+                  </button>
+                  <button
+                    onClick={() => {
+                      editor.chain().focus().splitCell().run()
+                      setIsTableDropdownOpen(false)
+                    }}
+                    className="w-full text-left px-3 py-1 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    Split Cell
+                  </button>
+
+                  <div className="border-t border-gray-100 dark:border-gray-700 my-1" />
+                  <button
+                    onClick={() => {
+                      editor.chain().focus().toggleHeaderRow().run()
+                      setIsTableDropdownOpen(false)
+                    }}
+                    className="w-full text-left px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    Toggle Header Row
+                  </button>
+                  <button
+                    onClick={() => {
+                      editor.chain().focus().deleteTable().run()
+                      setIsTableDropdownOpen(false)
+                    }}
+                    className="w-full text-left px-3 py-1.5 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors font-medium"
+                  >
+                    Delete Table
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
         <div className="flex-1" />
 
         {/* Save button */}
         {onSave && (
           <button
             onClick={onSave}
-            className="px-5 py-2 text-sm font-medium rounded-full transition-colors bg-gray-900 hover:bg-gray-700 text-white"
+            className="px-5 py-2 text-sm font-medium rounded-full transition-colors bg-todoist-red hover:bg-todoist-red-hover text-white"
           >
             Save
           </button>
         )}
       </div>
+      )}
 
       {/* Editor */}
       <div 
         className="flex-1 overflow-y-auto relative"
+        style={hideScrollbar ? {
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none'
+        } : {}}
         onDrop={handleDrop}
         onDragOver={(e) => e.preventDefault()}
         onPaste={handlePaste}
       >
+        {hideScrollbar && (
+          <style>{`
+            div[class*="overflow-y-auto"]::-webkit-scrollbar {
+              display: none;
+            }
+          `}</style>
+        )}
+        {editor && (
+          <BubbleMenu
+            editor={editor}
+            tippyOptions={{ duration: 100 }}
+            className="flex items-center gap-1 p-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg"
+          >
+            <button
+              onClick={() => editor.chain().focus().toggleBold().run()}
+              className={`p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
+                editor.isActive('bold')
+                  ? 'text-blue-600 dark:text-blue-400 bg-gray-100 dark:bg-gray-700'
+                  : 'text-gray-600 dark:text-gray-300'
+              }`}
+              title="Bold"
+            >
+              <Bold className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => editor.chain().focus().toggleItalic().run()}
+              className={`p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
+                editor.isActive('italic')
+                  ? 'text-blue-600 dark:text-blue-400 bg-gray-100 dark:bg-gray-700'
+                  : 'text-gray-600 dark:text-gray-300'
+              }`}
+              title="Italic"
+            >
+              <Italic className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => editor.chain().focus().toggleUnderline().run()}
+              className={`p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
+                editor.isActive('underline')
+                  ? 'text-blue-600 dark:text-blue-400 bg-gray-100 dark:bg-gray-700'
+                  : 'text-gray-600 dark:text-gray-300'
+              }`}
+              title="Underline"
+            >
+              <UnderlineIcon className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => editor.chain().focus().toggleStrike().run()}
+              className={`p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
+                editor.isActive('strike')
+                  ? 'text-blue-600 dark:text-blue-400 bg-gray-100 dark:bg-gray-700'
+                  : 'text-gray-600 dark:text-gray-300'
+              }`}
+              title="Strikethrough"
+            >
+              <Strikethrough className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => editor.chain().focus().toggleHighlight().run()}
+              className={`p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
+                editor.isActive('highlight')
+                  ? 'text-yellow-600 dark:text-yellow-400 bg-gray-100 dark:bg-gray-700'
+                  : 'text-gray-600 dark:text-gray-300'
+              }`}
+              title="Highlight"
+            >
+              <Highlighter className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => {
+                const url = window.prompt('Enter URL:')
+                if (url) {
+                  editor.chain().focus().setLink({ href: url }).run()
+                } else if (url === '') {
+                  editor.chain().focus().unsetLink().run()
+                }
+              }}
+              className={`p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
+                editor.isActive('link')
+                  ? 'text-blue-600 dark:text-blue-400 bg-gray-100 dark:bg-gray-700'
+                  : 'text-gray-600 dark:text-gray-300'
+              }`}
+              title="Link"
+            >
+              <LinkIcon className="w-4 h-4" />
+            </button>
+          </BubbleMenu>
+        )}
         <EditorContent
           editor={editor}
           className="prose prose-sm dark:prose-invert max-w-none p-6 focus:outline-none min-h-[200px] h-full
@@ -483,6 +884,7 @@ function TipTapEditor({ content, onChange, editable = true, moveCursorToEnd = fa
             prose-hr:my-6 prose-hr:border-t prose-hr:border-gray-200 prose-hr:dark:border-gray-700
             prose-strong:font-semibold prose-strong:text-gray-900 prose-strong:dark:text-gray-100
             prose-em:italic prose-em:text-gray-700 prose-em:dark:text-gray-300
+            prose-a:text-blue-600 prose-a:hover:text-blue-700 prose-a:underline prose-a:dark:text-blue-400
             [&_.ProseMirror]:min-h-[200px] [&_.ProseMirror]:h-full [&_.ProseMirror]:outline-none [&_.ProseMirror]:text-gray-800 [&_.ProseMirror]:dark:text-gray-200
             [&_.ProseMirror]:leading-relaxed [&_.ProseMirror]:font-sans
             [&_.ProseMirror_p]:my-3 [&_.ProseMirror_p]:leading-relaxed
@@ -494,7 +896,8 @@ function TipTapEditor({ content, onChange, editable = true, moveCursorToEnd = fa
             [&_.resize-handle-se]:bottom-[-6px] [&_.resize-handle-se]:right-[-6px] [&_.resize-handle-se]:cursor-se-resize
             [&_.resize-handle-sw]:bottom-[-6px] [&_.resize-handle-sw]:left-[-6px] [&_.resize-handle-sw]:cursor-sw-resize
             [&_.resize-handle-ne]:top-[-6px] [&_.resize-handle-ne]:right-[-6px] [&_.resize-handle-ne]:cursor-ne-resize
-            [&_.resize-handle-nw]:top-[-6px] [&_.resize-handle-nw]:left-[-6px] [&_.resize-handle-nw]:cursor-nw-resize"
+            [&_.resize-handle-nw]:top-[-6px] [&_.resize-handle-nw]:left-[-6px] [&_.resize-handle-nw]:cursor-nw-resize
+            [&_mark]:bg-yellow-200 [&_mark]:dark:bg-yellow-800/50 [&_mark]:rounded [&_mark]:px-0.5"
         />
         {/* Drop zone indicator */}
         <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-0 transition-opacity">

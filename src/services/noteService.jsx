@@ -57,3 +57,16 @@ export async function getNotesByProject(projectId) {
     return { success: false, data: null, error: error.toString() }
   }
 }
+
+export async function getNotesByMeeting(meetingId) {
+  try {
+    const response = await getNotes()
+    if (response.success && response.data) {
+      const meetingNotes = response.data.filter(note => note.meeting_id === meetingId)
+      return { success: true, data: meetingNotes, error: null }
+    }
+    return response
+  } catch (error) {
+    return { success: false, data: null, error: error.toString() }
+  }
+}

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { List, LayoutGrid, Filter, ArrowUpDown, Plus, Play, CheckCircle, Calendar, Trash2, Square, Loader2 } from 'lucide-react'
+import { List, LayoutGrid, Filter, ArrowUpDown, Plus, Play, CheckCircle, Calendar, Trash2, Square, Loader2, Eye, EyeOff } from 'lucide-react'
 import { BoardView } from '../components/BoardView'
 import ConfirmModal from '../components/ConfirmModal'
 import TaskCard from '../components/TaskCard'
@@ -15,6 +15,7 @@ import { groupCompletedTasks } from '../utils/taskGrouping'
 function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, onActivityStopped, runningActivity: propRunningActivity }) {
   const [viewMode, setViewMode] = useState('board')
   const [showCompleted, setShowCompleted] = useState(false)
+  const [showDone, setShowDone] = useState(false)
   const [showTodo, setShowTodo] = useState(true)
   const [showInProgress, setShowInProgress] = useState(true)
   const [showWaiting, setShowWaiting] = useState(true)
@@ -337,7 +338,7 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
     ...(showTodo ? pendingTasks : []),
     ...(showInProgress ? inProgressTasks : []),
     ...(showWaiting ? waitingTasks : []),
-    ...(showCompleted ? oneTimeTasks : [])
+    ...(showDone ? oneTimeTasks : [])
   ]
 
   // Add state for projects dropdown
@@ -430,7 +431,7 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
                     <div className="max-h-64 space-y-1 overflow-auto">
                       <label className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
                         selectedProjects.length === 0
-                          ? 'bg-gray-100 text-gray-900'
+                          ? 'bg-todoist-red-light dark:bg-red-900/30 text-todoist-red dark:text-red-400'
                           : 'text-gray-700 hover:bg-gray-50'
                       }`}>
                         <input
@@ -444,7 +445,7 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
                       {projects.map(project => (
                         <label key={project.id} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
                           selectedProjects.includes(project.id)
-                            ? 'bg-gray-100 text-gray-900'
+                            ? 'bg-todoist-red-light dark:bg-red-900/30 text-todoist-red dark:text-red-400'
                             : 'text-gray-700 hover:bg-gray-50'
                         }`}>
                           <input
@@ -692,6 +693,19 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
                 </div>
               )}
             </div>
+
+            <button
+              onClick={() => setShowDone(!showDone)}
+              className={`inline-flex h-9 items-center justify-center gap-2 rounded-full border px-3 text-sm font-medium transition-colors ${
+                showDone
+                  ? 'border-gray-900 bg-gray-900 text-white'
+                  : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              }`}
+              title={showDone ? 'Hide Done' : 'Show Done'}
+            >
+              {showDone ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+              <span>Done</span>
+            </button>
           </div>
         </div>
       </div>
@@ -750,9 +764,9 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
                     )}
                   </button>
                   <button
-                    onClick={() => setShowCompleted(!showCompleted)}
+                    onClick={() => setShowDone(!showDone)}
                     className={`flex items-center justify-center gap-2 px-3 py-2 rounded-full transition-colors text-sm font-medium ${
-                      showCompleted
+                      showDone
                         ? 'bg-gray-900 text-white hover:bg-gray-700'
                         : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
                     }`}
@@ -837,6 +851,7 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
               onStartActivity={handleStartTaskActivity}
               onStopActivity={handleStopTaskActivity}
               runningActivity={runningActivity}
+              showDone={showDone}
             />
           </div>
         )}

@@ -1,90 +1,97 @@
 import { useState, useEffect } from 'react'
+import { getNotesByMeeting, createNote } from '../services/noteService'
+import { getTasksByMeeting, createTask, updateTask } from '../services/taskService'
 
 function MeetingView({ meeting, onClose }) {
-  const [isJoined, setIsJoined] = useState(true)
   const [activeTab, setActiveTab] = useState('notes') // 'notes' or 'tasks'
   const [notes, setNotes] = useState([])
   const [tasks, setTasks] = useState([])
   const [newNote, setNewNote] = useState('')
   const [newTask, setNewTask] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  // Sample existing notes
-  const existingNotes = [
-    {
-      id: 1,
-      content: "Discussed progress on current sprint. John completed authentication module.",
-      timestamp: "2024-03-27T09:15:00",
-      author: "Sarah"
-    },
-    {
-      id: 2,
-      content: "Mike reported blocker in API integration. Emma will help resolve.",
-      timestamp: "2024-03-27T09:20:00",
-      author: "Mike"
+  const meetingId = meeting?.externalId || meeting?.entry_id || meeting?.id;
+
+  const loadMeetingData = async () => {
+    if (!meetingId) return;
+    setLoading(true);
+    try {
+      const notesRes = await getNotesByMeeting(meetingId);
+      if (notesRes.success && notesRes.data) {
+        setNotes(notesRes.data);
+      }
+
+      const tasksRes = await getTasksByMeeting(meetingId);
+      if (tasksRes.success && tasksRes.data) {
+        setTasks(tasksRes.data);
+      }
+    } catch (err) {
+      console.error('Error loading meeting details:', err);
+    } finally {
+      setLoading(false);
     }
-  ]
+  };
 
-  // Sample existing tasks
-  const existingTasks = [
-    {
-      id: 1,
-      title: "Fix API integration issue",
-      assignedTo: "Emma",
-      priority: "high",
-      status: "in-progress",
-      dueDate: "2024-03-28"
-    },
-    {
-      id: 2,
-      title: "Complete authentication module testing",
-      assignedTo: "John",
-      priority: "medium",
-      status: "pending",
-      dueDate: "2024-03-29"
-    }
-  ]
-
-  // Initialize with existing data
   useEffect(() => {
-    setNotes(existingNotes)
-    setTasks(existingTasks)
-  }, [])
+    loadMeetingData();
+  }, [meetingId]);
 
-  // Note: isJoined is always true - auto join on enter
-
-
-  const handleAddNote = () => {
-    if (newNote.trim()) {
-      const note = {
-        id: notes.length + 1,
-        content: newNote,
-        timestamp: new Date().toISOString(),
-        author: "Current User"
+  const handleAddNote = async () => {
+    if (newNote.trim() && meetingId) {
+      const payload = {
+        title: `Meeting Note - ${meeting.title}`,
+        content: newNote.trim(),
+        project_id: meeting.project_id || null,
+        note_type: 'meeting',
+        created_date: new Date().toISOString().split('T')[0],
+        meeting_id: meetingId
+      };
+      
+      const res = await createNote(payload);
+      if (res.success) {
+        setNewNote('');
+        loadMeetingData();
       }
-      setNotes([...notes, note])
-      setNewNote('')
     }
   }
 
-  const handleAddTask = () => {
-    if (newTask.trim()) {
-      const task = {
-        id: tasks.length + 1,
-        title: newTask,
-        assignedTo: "Unassigned",
-        priority: "medium",
-        status: "pending",
-        dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0]
+  const handleAddTask = async () => {
+    if (newTask.trim() && meetingId) {
+      const payload = {
+        title: newTask.trim(),
+        description: '',
+        status: 'todo',
+        priority: 'medium',
+        due_date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
+        scheduled_date: new Date().toISOString().split('T')[0],
+        project_id: meeting.project_id || null,
+        is_recurring: 0,
+        recurrence_type: null,
+        recurrence_interval: 1,
+        meeting_id: meetingId
+      };
+
+      const res = await createTask(payload);
+      if (res.success) {
+        setNewTask('');
+        loadMeetingData();
       }
-      setTasks([...tasks, task])
-      setNewTask('')
     }
   }
 
-  const updateTaskStatus = (taskId, newStatus) => {
-    setTasks(tasks.map(task =>
-      task.occurrence_id === taskId ? { ...task, status: newStatus } : task
-    ))
+  const updateTaskStatus = async (taskId, newStatus) => {
+    const task = tasks.find(t => t.id === taskId);
+    if (!task) return;
+
+    const payload = {
+      ...task,
+      status: newStatus
+    };
+    
+    const res = await updateTask(payload);
+    if (res.success) {
+      loadMeetingData();
+    }
   }
 
   const getPriorityColor = (priority) => {
@@ -106,15 +113,15 @@ function MeetingView({ meeting, onClose }) {
         return 'bg-blue-50 dark:bg-blue-900/30 text-todoist-priority-3 dark:text-blue-400'
       case 'in-progress':
         return 'bg-orange-50 dark:bg-orange-900/30 text-todoist-priority-2 dark:text-orange-400'
+      case 'todo':
       case 'pending':
-        return 'bg-todoist-sidebar-bg dark:bg-gray-800 text-todoist-text-secondary dark:text-gray-400'
       default:
         return 'bg-todoist-sidebar-bg dark:bg-gray-800 text-todoist-text-secondary dark:text-gray-400'
     }
   }
 
   return (
-    <div className="h-full bg-todoist-sidebar-bg dark:bg-gray-950 p-8">
+    <div className="h-full bg-todoist-sidebar-bg dark:bg-gray-950 p-8 overflow-y-auto">
       {/* Header */}
       <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm p-6 mb-6 border border-todoist-border dark:border-gray-800">
         <div className="flex items-center justify-between mb-4">
@@ -186,7 +193,11 @@ function MeetingView({ meeting, onClose }) {
       </div>
 
       {/* Main Content - Always show since auto-joined */}
-      <>
+      {loading ? (
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-todoist-red"></div>
+        </div>
+      ) : (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
           {/* Notes Section - takes 3 columns */}
           <div className="lg:col-span-3 bg-white dark:bg-gray-900 rounded-lg shadow-sm p-6 border border-todoist-border dark:border-gray-800">
@@ -240,9 +251,9 @@ function MeetingView({ meeting, onClose }) {
                   {notes.map(note => (
                     <div key={note.id} className="p-3 bg-todoist-sidebar-bg dark:bg-gray-800 rounded-lg border border-todoist-border dark:border-gray-700">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-todoist-text-primary dark:text-white">{note.author}</span>
+                        <span className="text-sm font-medium text-todoist-text-primary dark:text-white">{note.author || "Current User"}</span>
                         <span className="text-xs text-todoist-text-secondary dark:text-gray-400">
-                          {new Date(note.timestamp).toLocaleString()}
+                          {new Date(note.created_at || note.created_date).toLocaleString()}
                         </span>
                       </div>
                       <p className="text-sm text-todoist-text-secondary dark:text-gray-300">{note.content}</p>
@@ -277,12 +288,12 @@ function MeetingView({ meeting, onClose }) {
                 {/* Tasks List */}
                 <div className="space-y-2 max-h-96 overflow-y-auto">
                   {tasks.map(task => (
-                    <div key={task.occurrence_id} className="p-3 bg-todoist-sidebar-bg dark:bg-gray-800 rounded-lg border border-todoist-border dark:border-gray-700">
+                    <div key={task.id} className="p-3 bg-todoist-sidebar-bg dark:bg-gray-800 rounded-lg border border-todoist-border dark:border-gray-700">
                       <div className="flex items-center justify-between mb-2">
                         <h4 className="text-sm font-medium text-todoist-text-primary dark:text-white">{task.title}</h4>
                         <select
                           value={task.status}
-                          onChange={(e) => updateTaskStatus(task.occurrence_id, e.target.value)}
+                          onChange={(e) => updateTaskStatus(task.id, e.target.value)}
                           className={`text-xs px-2 py-1 rounded ${getStatusColor(task.status)}`}
                         >
                           <option value="todo">To Do</option>
@@ -291,11 +302,11 @@ function MeetingView({ meeting, onClose }) {
                         </select>
                       </div>
                       <div className="flex items-center gap-3 text-xs text-todoist-text-secondary dark:text-gray-400">
-                        <span>Assigned to: {task.assignedTo}</span>
+                        <span>Assigned to: {task.assignedTo || "Unassigned"}</span>
                         <span className={`px-2 py-1 rounded-full border ${getPriorityColor(task.priority)}`}>
                           {task.priority}
                         </span>
-                        <span>Due: {task.dueDate}</span>
+                        <span>Due: {task.due_date || task.dueDate}</span>
                       </div>
                     </div>
                   ))}
@@ -328,7 +339,7 @@ function MeetingView({ meeting, onClose }) {
             </div>
           </div>
         </div>
-      </>
+      )}
     </div>
   )
 }

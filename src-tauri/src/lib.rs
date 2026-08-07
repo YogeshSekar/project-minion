@@ -12,6 +12,8 @@ use commands::{create_project, delete_project, get_all_projects, get_project, up
 use outlook::get_outlook_meetings;
 use database::init_db;
 use tauri::Manager;
+use tauri_plugin_autostart::MacosLauncher;
+use tauri_plugin_autostart::ManagerExt;
 
 mod commands;
 mod database;
@@ -22,6 +24,7 @@ mod services;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
         .setup(|app| {
             let app_handle = app.handle().clone();
             tauri::async_runtime::block_on(async move {
@@ -73,8 +76,26 @@ pub fn run() {
             create_checklist_item,
             get_checklist_items_by_task,
             update_checklist_item,
-            delete_checklist_item
+            delete_checklist_item,
+            set_autostart,
+            get_autostart
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[tauri::command]
+async fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
+    let autostart_manager = app.autolaunch();
+    if enabled {
+        autostart_manager.enable().map_err(|e| e.to_string())
+    } else {
+        autostart_manager.disable().map_err(|e| e.to_string())
+    }
+}
+
+#[tauri::command]
+async fn get_autostart(app: tauri::AppHandle) -> Result<bool, String> {
+    let autostart_manager = app.autolaunch();
+    autostart_manager.is_enabled().map_err(|e| e.to_string())
 }

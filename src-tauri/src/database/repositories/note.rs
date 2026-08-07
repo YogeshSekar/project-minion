@@ -7,8 +7,8 @@ pub async fn create_note(
 ) -> Result<Note, sqlx::Error> {
     let note = sqlx::query_as::<_, Note>(
         r#"
-        INSERT INTO notes (title, content, created_date, project_id, note_type)
-        VALUES (?1, ?2, ?3, ?4, ?5)
+        INSERT INTO notes (title, content, created_date, project_id, note_type, meeting_id)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6)
         RETURNING *
         "#,
     )
@@ -17,6 +17,7 @@ pub async fn create_note(
     .bind(&req.created_date)
     .bind(req.project_id)
     .bind(&req.note_type)
+    .bind(&req.meeting_id)
     .fetch_one(pool)
     .await?;
 
@@ -68,8 +69,8 @@ pub async fn update_note(
     let note = sqlx::query_as::<_, Note>(
         r#"
         UPDATE notes
-        SET title = ?1, content = ?2, project_id = ?3, note_type = ?4, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?5
+        SET title = ?1, content = ?2, project_id = ?3, note_type = ?4, meeting_id = ?5, updated_at = CURRENT_TIMESTAMP
+        WHERE id = ?6
         RETURNING *
         "#,
     )
@@ -77,6 +78,7 @@ pub async fn update_note(
     .bind(&req.content)
     .bind(req.project_id)
     .bind(&req.note_type)
+    .bind(&req.meeting_id)
     .bind(req.id)
     .fetch_one(pool)
     .await?;
