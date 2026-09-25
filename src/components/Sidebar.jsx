@@ -1,12 +1,11 @@
-import { Home, CheckSquare, Folder, Users, FileText, Target, TrendingUp, ChevronLeft, ChevronRight, Plus, Timer } from 'lucide-react'
+import { Home, CheckSquare, Folder, Users, FileText, BarChart3, Bell, Settings } from 'lucide-react'
 
 const menuItems = [
-  { id: 'home', label: 'Dashboard', icon: Home },
+  { id: 'home', label: 'Home', icon: Home },
   { id: 'tasks', label: 'My Task', icon: CheckSquare },
-  { id: 'meetings', label: 'Chats', icon: Users },
-  { id: 'notes', label: 'Documents', icon: FileText },
-  { id: 'activities', label: 'Activity', icon: Timer },
-  { id: 'habits', label: 'Receipts', icon: Target },
+  { id: 'notes', label: 'Pages', icon: FileText },
+  { id: 'meetings', label: 'Meetings', icon: Users },
+  { id: 'activities', label: 'Analytics', icon: BarChart3 },
   { id: 'projects', label: 'Projects', icon: Folder },
 ]
 
@@ -17,6 +16,7 @@ export default function Sidebar({
   onToggleCollapse,
   onAddTask,
   onAddProject,
+  onSettingsClick,
 }) {
   const isValidItem = activeItem && menuItems.some(item => item.id === activeItem)
   const displayItem = isValidItem ? activeItem : 'home'
@@ -25,18 +25,16 @@ export default function Sidebar({
     <div
       className={`
         w-16
-        h-[calc(100vh-3.5rem-2rem)] flex flex-col relative
-        bg-white
-        border border-gray-200
-        rounded-2xl
-        ml-4 mt-4 mb-4
+        h-full flex flex-col relative
+        bg-slate-900
+        border-r border-slate-800
         transition-all duration-300 ease-in-out
       `}
     >
       
       {/* Navigation Menu */}
-      <nav className="flex-1 py-3 px-2 overflow-y-auto">
-        <div className="space-y-1">
+      <nav className="flex-1 py-3 px-2 overflow-y-auto" aria-label="Main navigation">
+        <div className="space-y-1.5">
           {menuItems.map((item) => {
             const Icon = item.icon
             const isActive = displayItem === item.id
@@ -46,25 +44,43 @@ export default function Sidebar({
                 key={item.id}
                 onClick={() => onItemSelect(item.id)}
                 className={`
-                  w-full flex items-center justify-center px-2 py-2.5 rounded-2xl
+                  w-full flex h-10 items-center justify-center rounded-xl
                   text-sm font-medium transition-all duration-200 ease-out
-                  group relative
+                  group relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900
                   ${isActive
-                    ? 'bg-gray-900 text-white'
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                    ? 'bg-indigo-500 text-white'
+                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
                   }
                 `}
                 title={item.label}
+                aria-label={item.label}
+                aria-current={isActive ? 'page' : undefined}
               >
-                <Icon className={`
-                  w-5 h-5 flex-shrink-0 flex items-center justify-center
-                  ${isActive ? 'text-white' : ''}
-                `} />
+                <Icon className="h-5 w-5 flex-shrink-0" />
               </button>
             )
           })}
         </div>
       </nav>
+
+      {/* Bottom Icons */}
+      <div className="space-y-1.5 border-t border-slate-800 px-2 pb-3 pt-3">
+        <button
+          className="flex h-10 w-full items-center justify-center rounded-xl text-slate-300 transition-colors hover:bg-slate-800 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
+          title="Notifications"
+          aria-label="Notifications"
+        >
+          <Bell className="w-5 h-5 flex-shrink-0 flex items-center justify-center" />
+        </button>
+        <button
+          onClick={onSettingsClick}
+          className="flex h-10 w-full items-center justify-center rounded-xl text-slate-300 transition-colors hover:bg-slate-800 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
+          title="Settings"
+          aria-label="Settings"
+        >
+          <Settings className="w-5 h-5 flex-shrink-0 flex items-center justify-center" />
+        </button>
+      </div>
 
           </div>
   )

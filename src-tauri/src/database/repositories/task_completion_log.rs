@@ -1,5 +1,7 @@
+use crate::database::models::task_completion_log::{
+    CreateTaskCompletionLogRequest, TaskCompletionLog, UpdateTaskCompletionLogRequest,
+};
 use sqlx::{Pool, Sqlite};
-use crate::database::models::task_completion_log::{TaskCompletionLog, CreateTaskCompletionLogRequest, UpdateTaskCompletionLogRequest};
 
 pub async fn create_task_completion_log(
     pool: &Pool<Sqlite>,
@@ -84,10 +86,7 @@ pub async fn get_task_completion_log_by_id(
     Ok(log)
 }
 
-pub async fn delete_task_completion_log(
-    pool: &Pool<Sqlite>,
-    id: i64,
-) -> Result<(), sqlx::Error> {
+pub async fn delete_task_completion_log(pool: &Pool<Sqlite>, id: i64) -> Result<(), sqlx::Error> {
     sqlx::query(
         r#"
         DELETE FROM task_completion_logs WHERE id = ?1

@@ -1,5 +1,7 @@
+use crate::database::models::meeting::{
+    CreateMeetingRequest, Meeting, UpdateMeetingRequest, UpdateMeetingUrlRequest,
+};
 use sqlx::{Pool, Sqlite};
-use crate::database::models::meeting::{Meeting, CreateMeetingRequest, UpdateMeetingRequest, UpdateMeetingUrlRequest};
 
 pub async fn create_meeting(
     pool: &Pool<Sqlite>,
@@ -71,6 +73,20 @@ pub async fn get_meeting_by_outlook_id(
     .await?;
 
     Ok(meeting)
+}
+
+pub async fn set_meeting_project(
+    pool: &Pool<Sqlite>,
+    outlook_id: String,
+    project_id: Option<i64>,
+) -> Result<Meeting, sqlx::Error> {
+    sqlx::query_as::<_, Meeting>(
+        "UPDATE meetings SET project_id = ?1, updated_at = CURRENT_TIMESTAMP WHERE outlook_id = ?2 RETURNING *",
+    )
+    .bind(project_id)
+    .bind(outlook_id)
+    .fetch_one(pool)
+    .await
 }
 
 pub async fn update_meeting_url(

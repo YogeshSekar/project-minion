@@ -1,761 +1,150 @@
-import { useState, useEffect } from 'react'
-import { Plus, Edit2, Calendar, Flag, Trash2, CheckSquare, Circle, Star } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { CalendarDays, Check, CheckCircle2, Circle, Clock3, Edit3, FileText, Flag, FolderKanban, Link2, ListTodo, Plus, Trash2, Unlink2, X } from 'lucide-react'
 import ProjectModal from '../components/ProjectModal'
 import ConfirmModal from '../components/ConfirmModal'
 import TaskSidePanel from '../components/TaskSidePanel'
-import CreateNoteModal from '../components/CreateNoteModal'
-import TaskCard from '../components/TaskCard'
-import GroupedCompletedTaskCard from '../components/GroupedCompletedTaskCard'
+import Select from '../components/ui/Select'
 import useProjects from '../hooks/useProjects'
 import useTasks from '../hooks/useTasks'
-import useNotes from '../hooks/useNotes'
-import { startActivity, stopCurrentActivity } from '../services/activityService'
-import { getRunningActivity } from '../services/api'
-import { formatDate, getStatusColor, getPriorityColor, formatStatusLabel, isOverdue } from '../utils/helpers'
-import { groupCompletedTasks } from '../utils/taskGrouping'
+import usePages from '../hooks/usePages'
+import { formatDate, isOverdue } from '../utils/helpers'
 
-function ProjectsPage({ runningActivity: propRunningActivity, onActivityStarted, onActivityStopped }) {
-  const [showActive, setShowActive] = useState(true)
-  const [showCompleted, setShowCompleted] = useState(true)
-  const [showOnHold, setShowOnHold] = useState(true)
-  const [selectedProject, setSelectedProject] = useState(null)
-  const [editForm, setEditForm] = useState(null)
-  const [isModalOpen, setIsModalOpen] = useState(false)
-  const [modalMode, setModalMode] = useState('create')
-  const [projectForEdit, setProjectForEdit] = useState(null)
-  const [projectTasks, setProjectTasks] = useState([])
-  const [projectNotes, setProjectNotes] = useState('')
-  const [taskFilter, setTaskFilter] = useState('todo')
-  const [isTaskSidePanelOpen, setIsTaskSidePanelOpen] = useState(false)
-  const [selectedTaskForEdit, setSelectedTaskForEdit] = useState(null)
-  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false)
-  const [noteForEdit, setNoteForEdit] = useState(null)
-  const [localRunningActivity, setLocalRunningActivity] = useState(null)
-  
-  // Use hooks for data management
-  const { projects, loading: projectsLoading, updateProject, deleteProject } = useProjects()
-  const { tasks, createTask, updateTask, deleteTask, loadTasks } = useTasks()
-  const { notes, deleteNote } = useNotes()
-  
-  // Use running activity from props if provided, otherwise track locally
-  const runningActivity = propRunningActivity !== undefined ? propRunningActivity : localRunningActivity
-  
-  // Load running activity on mount (only if not provided via props)
-  useEffect(() => {
-    if (propRunningActivity === undefined) {
-      const loadRunningActivity = async () => {
-        try {
-          const response = await getRunningActivity()
-          if (response.success) {
-            setLocalRunningActivity(response.data || null)
-          }
-        } catch (error) {
-          console.error('Error loading running activity:', error)
-        }
-      }
-      loadRunningActivity()
-    }
-  }, [])
-
-  // Confirm modal state
-  const [confirmModalOpen, setConfirmModalOpen] = useState(false)
-  const [confirmModalConfig, setConfirmModalConfig] = useState({
-    title: '',
-    message: '',
-    confirmText: 'Confirm',
-    cancelText: 'Cancel',
-    type: 'confirm',
-    onConfirm: () => {},
-    onCancel: () => {}
-  })
-
-  // Load project tasks when project is selected
-  useEffect(() => {
-    if (selectedProject) {
-      const filteredTasks = tasks.filter(task => task.project_id === selectedProject.id)
-      setProjectTasks(filteredTasks)
-      // Load notes from localStorage
-      const savedNotes = localStorage.getItem(`project_notes_${selectedProject.id}`)
-      setProjectNotes(savedNotes || '')
-    }
-  }, [selectedProject, tasks])
-
-  // Group completed tasks for recurring tasks
-  const { oneTimeTasks, groupedRecurring } = groupCompletedTasks(
-    projectTasks.filter(t => t.status === 'completed')
-  )
-
-  const handleCreateProject = () => {
-    setModalMode('create')
-    setProjectForEdit(null)
-    setIsModalOpen(true)
-  }
-
-  const handleEditProject = () => {
-    if (!selectedProject) return
-    setModalMode('edit')
-    setProjectForEdit(selectedProject)
-    setIsModalOpen(true)
-  }
-
-  const showConfirm = (config) => {
-    setConfirmModalConfig({
-      ...config,
-      onConfirm: () => {
-        config.onConfirm()
-        setConfirmModalOpen(false)
-      },
-      onCancel: () => {
-        if (config.onCancel) config.onCancel()
-        setConfirmModalOpen(false)
-      }
-    })
-    setConfirmModalOpen(true)
-  }
-
-  const handleDeleteProject = () => {
-    if (!selectedProject) return
-    showConfirm({
-      title: 'Delete Project',
-      message: `Are you sure you want to delete "${selectedProject.title}"? This action cannot be undone.`,
-      confirmText: 'Delete',
-      cancelText: 'Cancel',
-      type: 'danger',
-      onConfirm: async () => {
-        const response = await deleteProject(selectedProject.id)
-        if (response.success) {
-          setSelectedProject(null)
-        }
-      }
-    })
-  }
-
-  const handleSaveProject = async () => {
-    // Hook auto-reloads, nothing to do
-  }
-
-  const handleCompleteProject = () => {
-    if (!selectedProject) return
-    if (selectedProject.status === 'completed') {
-      showConfirm({
-        title: 'Already Completed',
-        message: 'This project is already marked as completed.',
-        confirmText: 'OK',
-        cancelText: null,
-        type: 'success',
-        onConfirm: () => {}
-      })
-      return
-    }
-    showConfirm({
-      title: 'Complete Project',
-      message: `Mark "${selectedProject.title}" as complete?`,
-      confirmText: 'Mark Complete',
-      cancelText: 'Cancel',
-      type: 'success',
-      onConfirm: async () => {
-        const response = await updateProject({
-          ...selectedProject,
-          status: 'completed'
-        })
-        if (response.success) {
-          setSelectedProject(response.data)
-        }
-      }
-    })
-  }
-
-  const handleReactivateProject = () => {
-    if (!selectedProject) return
-    if (selectedProject.status === 'active') {
-      showConfirm({
-        title: 'Already Active',
-        message: 'This project is already active.',
-        confirmText: 'OK',
-        cancelText: null,
-        type: 'confirm',
-        onConfirm: () => {}
-      })
-      return
-    }
-    showConfirm({
-      title: 'Reactivate Project',
-      message: `Reactivate "${selectedProject.title}"?`,
-      confirmText: 'Reactivate',
-      cancelText: 'Cancel',
-      type: 'confirm',
-      onConfirm: async () => {
-        const response = await updateProject({
-          ...selectedProject,
-          status: 'active'
-        })
-        if (response.success) {
-          setSelectedProject(response.data)
-        }
-      }
-    })
-  }
-
-
-  const activeProjects = projects.filter(p => p.status === 'active' || p.status === 'planning' || p.status === 'in_progress')
-  const completedProjects = projects.filter(p => p.status === 'completed')
-  const onHoldProjects = projects.filter(p => p.status === 'on_hold')
-  const visibleProjects = [
-    ...(showActive ? activeProjects : []),
-    ...(showOnHold ? onHoldProjects : []),
-    ...(showCompleted ? completedProjects : [])
-  ]
-
-  if (projectsLoading) {
-    return (
-      <div className="h-full bg-[#faf9f7] flex items-center justify-center">
-        <div className="flex items-center gap-3 text-gray-600">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-          <span>Loading projects...</span>
-        </div>
-      </div>
-    )
-  }
-
-  const handleSelectProject = (project) => {
-    setSelectedProject(project)
-    setEditForm({
-      ...project,
-      start_date: project.start_date ? new Date(project.start_date).toISOString().split('T')[0] : '',
-      deadline: project.deadline ? new Date(project.deadline).toISOString().split('T')[0] : ''
-    })
-  }
-
-  const handleCloseDetails = () => {
-    setSelectedProject(null)
-    setEditForm(null)
-  }
-
-  const handleSaveEdit = async () => {
-    if (!editForm) return
-    const response = await updateProject(editForm)
-    if (response.success) {
-      setSelectedProject(editForm)
-    }
-  }
-
-  const handleUpdateProject = async (updatedProject) => {
-    const response = await updateProject(updatedProject)
-    if (!response.success) {
-      console.error('Error updating project:', response.error)
-    }
-  }
-
-  const handleDeleteProjectFromCard = async (projectId) => {
-    const response = await deleteProject(projectId)
-    if (response.success) {
-      if (selectedProject?.id === projectId) {
-        setSelectedProject(null)
-        setEditForm(null)
-      }
-    }
-  }
-
-  const handleEditProjectFromCard = (project) => {
-    setModalMode('edit')
-    setProjectForEdit(project)
-    setIsModalOpen(true)
-  }
-
-  const handleSaveNotes = () => {
-    if (selectedProject) {
-      localStorage.setItem(`project_notes_${selectedProject.id}`, projectNotes)
-    }
-  }
-
-  // Task handlers
-  const handleToggleComplete = async (task) => {
-    const newStatus = task.status === 'completed' ? 'todo' : 'completed'
-    const response = await updateTask({
-      ...task,
-      status: newStatus
-    })
-    if (!response.success) {
-      console.error('Error updating task:', response.error)
-    }
-  }
-
-  const handleStartTaskActivity = async (task) => {
-    try {
-      const response = await startActivity({
-        title: task.title,
-        activity_type: 'focus_session',
-        source: 'manual',
-        reference_type: 'task',
-        reference_id: task.id,
-        project_id: task.project_id
-      })
-      if (response.success) {
-        if (propRunningActivity === undefined) {
-          await loadRunningActivity()
-        }
-        if (onActivityStarted) {
-          onActivityStarted(response.data, task)
-        }
-      }
-    } catch (error) {
-      console.error('Error starting task activity:', error)
-    }
-  }
-
-  const handleStopTaskActivity = async () => {
-    try {
-      const response = await stopCurrentActivity()
-      if (response.success) {
-        if (propRunningActivity === undefined) {
-          setLocalRunningActivity(null)
-        }
-        if (onActivityStopped) {
-          onActivityStopped()
-        }
-      }
-    } catch (error) {
-      console.error('Error stopping task activity:', error)
-    }
-  }
-
-  const handleTaskUpdate = async (updatedTask) => {
-    const response = await updateTask(updatedTask)
-    if (!response.success) {
-      console.error('Error updating task:', response.error)
-    }
-  }
-
-  const handleTaskDelete = async (taskId) => {
-    const response = await deleteTask(taskId)
-    if (!response.success) {
-      console.error('Error deleting task:', response.error)
-    }
-  }
-
-  const handleTaskEdit = (task) => {
-    setSelectedTaskForEdit(task)
-    setIsTaskSidePanelOpen(true)
-  }
-
-  const handleTaskSidePanelClose = () => {
-    setIsTaskSidePanelOpen(false)
-    setSelectedTaskForEdit(null)
-  }
-
-  const handleTaskSidePanelSave = async (updatedTask) => {
-    handleTaskSidePanelClose()
-  }
-
-  const handleTaskDeleteFromSidePanel = async (taskId) => {
-    await handleTaskDelete(taskId)
-    handleTaskSidePanelClose()
-  }
-
-  const handleNoteEdit = (note) => {
-    setNoteForEdit(note)
-    setIsNoteModalOpen(true)
-  }
-
-  const handleNoteDelete = async (noteId) => {
-    const response = await deleteNote(noteId)
-    if (!response.success) {
-      console.error('Error deleting note:', response.error)
-    }
-  }
-
-  const handleNoteModalClose = () => {
-    setIsNoteModalOpen(false)
-    setNoteForEdit(null)
-  }
-
-  const handleNoteSaved = () => {
-    handleNoteModalClose()
-  }
-
-  
-  return (
-    <div className="h-full bg-gray-60 flex gap-4 p-4">
-      {/* Left: Project List */}
-      <div className="w-96 flex flex-col overflow-hidden relative">
-        <div className="h-full flex flex-col">
-          {/* Project List */}
-          <div className="w-full h-full flex flex-col">
-            <div className="flex-1 overflow-auto">
-              <div className="w-full h-full rounded-2xl border border-gray-200 bg-white overflow-hidden">
-                <div className="bg-white p-4 border-b border-gray-200">
-                  <button
-                    onClick={handleCreateProject}
-                    className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gray-900 text-white rounded-full hover:bg-gray-700 transition-colors text-sm font-medium"
-                  >
-                    <Plus className="w-4 h-4" />
-                    <span>New Project</span>
-                  </button>
-                </div>
-                <div className="p-4">
-                  {visibleProjects.length > 0 ? (
-                    visibleProjects.map(project => (
-                      <div
-                        key={project.id}
-                        onClick={() => handleSelectProject(project)}
-                        className={`
-                          p-3 bg-white rounded-2xl border border-gray-100
-                          hover:border-gray-300 cursor-pointer transition-all duration-200 group mb-2
-                          ${selectedProject?.id === project.id 
-                            ? 'border-gray-900 bg-gray-100 ring-1 ring-gray-900/20' 
-                            : 'hover:bg-gray-50'}
-                        `}
-                      >
-                        <div className="flex items-center justify-between">
-                          <h4 className="flex-1 text-sm font-medium text-gray-900 truncate">
-                            {project.title}
-                          </h4>
-                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium border ${getStatusColor(project.status)}`}>
-                            {formatStatusLabel(project.status)}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-start mt-1">
-                          <div className="flex items-center gap-2 text-xs text-gray-500">
-                            <Calendar className="w-3 h-3" />
-                            <span>{project.deadline ? formatDate(project.deadline) : 'No deadline'}</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="py-12 text-center">
-                      <div className="flex flex-col items-center gap-3">
-                        <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
-                          <Circle className="w-6 h-6 text-gray-400" />
-                        </div>
-                        <p className="text-gray-500 font-medium">
-                          No projects to display
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Center: Project Details + Tasks */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {selectedProject ? (
-          <div className="h-full bg-white rounded-2xl border border-gray-200 overflow-hidden flex flex-col">
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 bg-white">
-              <div className="flex items-center gap-3">
-                <button className="p-2 text-gray-400 hover:text-yellow-500 hover:bg-yellow-50 rounded-lg transition-colors">
-                  <Star className="w-4 h-4" />
-                </button>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleEditProject}
-                  className="p-2 text-gray-400 hover:text-blue-600 hover:bg-gray-100 rounded-lg transition-colors"
-                  title="Edit Project"
-                >
-                  <Edit2 className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={handleDeleteProject}
-                  className="p-2 text-gray-400 hover:text-red-600 hover:bg-gray-100 rounded-lg transition-colors"
-                  title="Delete Project"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* Details Section - Fixed Height */}
-            <div className="flex-none border-b border-gray-200">
-              {/* Project Title */}
-              <div className="px-6 py-5">
-                <h2 className="text-2xl font-semibold text-gray-900">
-                  {selectedProject.title}
-                </h2>
-              </div>
-
-              {/* Properties List */}
-              <div className="px-6 pb-4 space-y-4">
-                {/* Status */}
-                <div className="flex items-center">
-                  <div className="w-32 flex items-center gap-2 text-sm text-gray-500">
-                    <Circle className="w-4 h-4" />
-                    <span>Status</span>
-                  </div>
-                  <span className={`px-3 py-1 rounded-2xl text-sm font-medium border ${getStatusColor(selectedProject.status)}`}>
-                    {formatStatusLabel(selectedProject.status)}
-                  </span>
-                </div>
-                {/* Priority */}
-                <div className="flex items-center">
-                  <div className="w-32 flex items-center gap-2 text-sm text-gray-500">
-                    <Flag className="w-4 h-4" />
-                    <span>Priority</span>
-                  </div>
-                  <span className={`px-3 py-1 rounded-2xl text-sm font-medium border ${getPriorityColor(selectedProject.priority)}`}>
-                    {formatStatusLabel(selectedProject.priority)}
-                  </span>
-                </div>
-                {/* Deadline */}
-                <div className="flex items-center">
-                  <div className="w-32 flex items-center gap-2 text-sm text-gray-500">
-                    <Calendar className="w-4 h-4" />
-                    <span>Deadline</span>
-                  </div>
-                  <span className="px-3 py-1 rounded-2xl bg-gray-100 text-gray-600 text-sm font-medium">
-                    {selectedProject.deadline ? formatDate(selectedProject.deadline) : 'Not set'}
-                  </span>
-                </div>
-                {/* Description */}
-                <div className="flex items-start">
-                  <div className="w-32 flex items-center gap-2 text-sm text-gray-500">
-                    <Edit2 className="w-4 h-4" />
-                    <span>Description</span>
-                  </div>
-                  <span className="text-sm text-gray-700 flex-1">
-                    {selectedProject.description || 'No description'}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Tasks Section - Scrollable */}
-            <div className="flex-1 overflow-auto">
-              <div className="px-6 py-4">
-                {/* Task Filter Tabs */}
-                <div className="flex border-b border-gray-200 mb-4">
-                  {['todo', 'in_progress', 'completed'].map((filter) => {
-                    let count
-                    if (filter === 'completed') {
-                      count = oneTimeTasks.length + groupedRecurring.length
-                    } else {
-                      count = projectTasks.filter(t => t.status === filter).length
-                    }
-                    const label = filter === 'todo' ? 'Todo' :
-                                  filter === 'in_progress' ? 'In Progress' : 'Completed'
-                    return (
-                      <button
-                        key={filter}
-                        onClick={() => setTaskFilter(filter)}
-                        className={`px-4 py-2 text-sm font-medium transition-colors ${
-                          taskFilter === filter
-                            ? 'text-gray-900 border-b-2 border-gray-900'
-                            : 'text-gray-500 hover:text-gray-700'
-                        }`}
-                      >
-                        {label} ({count})
-                      </button>
-                    )
-                  })}
-                </div>
-
-                {/* Filtered Tasks */}
-                {(() => {
-                  if (taskFilter === 'completed') {
-                    // Show grouped recurring and one-time completed tasks
-                    const hasCompleted = oneTimeTasks.length > 0 || groupedRecurring.length > 0
-                    return !hasCompleted ? (
-                      <div className="text-center py-8">
-                        <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                          <CheckSquare className="w-6 h-6 text-gray-400" />
-                        </div>
-                        <p className="text-gray-500">No tasks in this category</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {/* One-time completed tasks */}
-                        {oneTimeTasks.length > 0 && (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {oneTimeTasks.map((task) => (
-                              <TaskCard
-                                key={task.id}
-                                task={task}
-                                projects={projects}
-                                onToggleComplete={handleToggleComplete}
-                                onEdit={handleTaskEdit}
-                                onDelete={handleTaskDelete}
-                                onStartActivity={handleStartTaskActivity}
-                                onStopActivity={handleStopTaskActivity}
-                                runningActivity={runningActivity}
-                              />
-                            ))}
-                          </div>
-                        )}
-                        {/* Grouped recurring completed tasks */}
-                        {groupedRecurring.length > 0 && (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {groupedRecurring.map((group) => (
-                              <GroupedCompletedTaskCard
-                                key={group.task_id}
-                                group={group}
-                                projects={projects}
-                                onEdit={handleTaskEdit}
-                                onDelete={handleTaskDelete}
-                                onToggleComplete={handleToggleComplete}
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  } else {
-                    // Show todo or in-progress tasks normally
-                    const filteredTasks = projectTasks.filter(t => t.status === taskFilter)
-                    return filteredTasks.length === 0 ? (
-                      <div className="text-center py-8">
-                        <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                          <CheckSquare className="w-6 h-6 text-gray-400" />
-                        </div>
-                        <p className="text-gray-500">No tasks in this category</p>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {filteredTasks.map((task) => (
-                          <TaskCard
-                            key={task.id}
-                            task={task}
-                            projects={projects}
-                            onToggleComplete={handleToggleComplete}
-                            onEdit={handleTaskEdit}
-                            onDelete={handleTaskDelete}
-                            onStartActivity={handleStartTaskActivity}
-                            onStopActivity={handleStopTaskActivity}
-                            runningActivity={runningActivity}
-                          />
-                        ))}
-                      </div>
-                    )
-                  }
-                })()}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="h-full bg-white rounded-2xl border border-gray-200 overflow-hidden flex items-center justify-center">
-            <div className="text-center py-12 text-gray-500">
-                <svg className="w-16 h-16 mx-auto text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
-              <p className="text-lg font-medium mb-2 text-gray-900">No project selected</p>
-              <p className="text-sm">Select a project from the list to view details</p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Right: Notes List */}
-      <div className="w-96 flex flex-col overflow-hidden">
-        <div className="h-full bg-white rounded-2xl border border-gray-200 flex flex-col p-4 gap-4 overflow-hidden">
-          {/* Notes List */}
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Notes</div>
-            <div className="flex-1 overflow-auto">
-              {selectedProject ? (
-                <div className="space-y-2">
-                  {notes.filter(note => note.project_id === selectedProject.id).length > 0 ? (
-                    notes.filter(note => note.project_id === selectedProject.id).map(note => (
-                      <div
-                        key={note.id}
-                        className="p-3 bg-white rounded-2xl border border-gray-100 hover:border-gray-300 cursor-pointer transition-all duration-200 group relative"
-                      >
-                        <h4 className="text-sm font-medium text-gray-900 truncate pr-16">
-                          {note.title}
-                        </h4>
-                        <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleEditNote(note)
-                            }}
-                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                            title="Edit"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleDeleteNote(note.id)
-                            }}
-                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                            title="Delete"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="text-center py-8">
-                      <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Edit2 className="w-6 h-6 text-gray-400" />
-                      </div>
-                      <p className="text-gray-500 text-sm">No notes for this project</p>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Edit2 className="w-6 h-6 text-gray-400" />
-                  </div>
-                  <p className="text-gray-500 text-sm">Select a project to view notes</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Project Modal - Create/Edit */}
-      <ProjectModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        project={projectForEdit}
-        mode={modalMode}
-        onSave={handleSaveProject}
-        onDelete={modalMode === 'edit' ? handleDeleteProjectFromCard : null}
-      />
-      
-      {/* Confirm Modal */}
-      <ConfirmModal
-        isOpen={confirmModalOpen}
-        title={confirmModalConfig.title}
-        message={confirmModalConfig.message}
-        confirmText={confirmModalConfig.confirmText}
-        cancelText={confirmModalConfig.cancelText}
-        type={confirmModalConfig.type}
-        onConfirm={confirmModalConfig.onConfirm}
-        onCancel={confirmModalConfig.onCancel}
-      />
-
-      {/* Task Side Panel */}
-      <TaskSidePanel
-        isOpen={isTaskSidePanelOpen}
-        onClose={handleTaskSidePanelClose}
-        task={selectedTaskForEdit}
-        onSave={handleTaskSidePanelSave}
-        onUpdateTask={updateTask}
-        onCreateTask={createTask}
-        mode="edit"
-        projects={projects}
-        onDelete={handleTaskDeleteFromSidePanel}
-      />
-
-      {/* Note Modal */}
-      <CreateNoteModal
-        isOpen={isNoteModalOpen}
-        onClose={handleNoteModalClose}
-        onNoteCreated={handleNoteSaved}
-        note={noteForEdit}
-      />
-    </div>
-  )
+const STATUS = {
+  planning: ['Planning', 'bg-violet-500'],
+  in_progress: ['In progress', 'bg-blue-500'], on_hold: ['On hold', 'bg-amber-500'],
+  completed: ['Completed', 'bg-emerald-500']
 }
+const PRIORITY = {
+  high: ['High', 'bg-rose-500'], medium: ['Medium', 'bg-amber-500'], low: ['Low', 'bg-emerald-500']
+}
+
+function ProjectsPage({ runningActivity, onActivityStarted, onActivityStopped, onOpenPage, onOpenPages }) {
+  const { projects, loading, updateProject, deleteProject, loadProjects, upsertProject } = useProjects()
+  const { tasks, createTask, updateTask, deleteTask } = useTasks()
+  const { pages, loading: pagesLoading, updatePage } = usePages()
+  const [selectedId, setSelectedId] = useState(null)
+  const [statusFilter, setStatusFilter] = useState('open')
+  const [tab, setTab] = useState('overview')
+  const [taskFilter, setTaskFilter] = useState('open')
+  const [selectedPageId, setSelectedPageId] = useState(null)
+  const [pagePickerOpen, setPagePickerOpen] = useState(false)
+  const [pageSearch, setPageSearch] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [actionError, setActionError] = useState('')
+  const [projectModal, setProjectModal] = useState({ open: false, mode: 'create', project: null })
+  const [taskPanel, setTaskPanel] = useState({ open: false, task: null, mode: 'create' })
+  const [confirm, setConfirm] = useState({ open: false })
+
+  const filteredProjects = useMemo(() => projects
+    .filter(project => statusFilter === 'all' || (statusFilter === 'open' ? project.status !== 'completed' : project.status === statusFilter))
+    .sort((a, b) => a.status === 'completed' ? 1 : b.status === 'completed' ? -1 : (a.title || '').localeCompare(b.title || '')), [projects, statusFilter])
+
+  useEffect(() => {
+    if (!selectedId && filteredProjects.length) setSelectedId(filteredProjects[0].id)
+    else if (selectedId && !projects.some(project => project.id === selectedId)) setSelectedId(filteredProjects[0]?.id || null)
+  }, [filteredProjects, projects, selectedId])
+
+  const selected = projects.find(project => project.id === selectedId) || null
+  const projectTasks = selected ? tasks.filter(task => task.project_id === selected.id) : []
+  const linkedPages = selected ? pages.filter(page => page.project_id === selected.id && page.status !== 'archived') : []
+  const selectedPage = linkedPages.find(page => page.id === selectedPageId) || linkedPages[0] || null
+  const completedTasks = projectTasks.filter(task => task.status === 'completed').length
+  const progress = projectTasks.length ? Math.round(completedTasks / projectTasks.length * 100) : Number(selected?.progress || 0)
+  const visibleTasks = projectTasks.filter(task => taskFilter === 'all' || (taskFilter === 'open' ? task.status !== 'completed' : task.status === taskFilter))
+  const availablePages = pages.filter(page => page.project_id == null && page.status !== 'archived' && page.title.toLowerCase().includes(pageSearch.toLowerCase())).slice(0, 12)
+
+  useEffect(() => { setTab('overview'); setSelectedPageId(null); setPagePickerOpen(false); setActionError('') }, [selectedId])
+
+  const runAction = async action => {
+    if (busy) return
+    setBusy(true); setActionError('')
+    try { await action() } catch (error) { setActionError(error?.message || 'Could not complete the action') }
+    finally { setBusy(false) }
+  }
+  const savePageProject = (page, projectId) => updatePage({ id: page.id, project_id: projectId, area_id: page.area_id, title: page.title, content: page.content, page_type: page.page_type, status: page.status, sort_order: page.sort_order, meeting_id: page.meeting_id })
+  const linkPage = page => runAction(async () => {
+    const response = await savePageProject(page, selected.id)
+    if (!response.success) throw new Error(response.error || 'Could not link page')
+    setSelectedPageId(page.id); setPagePickerOpen(false); setPageSearch('')
+  })
+  const unlinkPage = page => runAction(async () => {
+    const response = await savePageProject(page, null)
+    if (!response.success) throw new Error(response.error || 'Could not unlink page')
+    setSelectedPageId(null)
+  })
+  const openPagesForProject = () => {
+    if (selected) localStorage.setItem('pages.selectedProjectId', String(selected.id))
+    onOpenPages?.()
+  }
+  const askDelete = (kind, item, action) => setConfirm({ open: true, title: `Delete ${kind}?`, message: `“${item.title}” will be permanently deleted.`, confirmText: `Delete ${kind}`, cancelText: 'Cancel', type: 'danger', onConfirm: async () => { await action(); setConfirm({ open: false }) } })
+  const toggleTask = task => updateTask({ ...task, status: task.status === 'completed' ? 'todo' : 'completed' })
+
+  return <div className="flex h-full min-h-0 min-w-0 flex-col bg-slate-100 text-slate-900">
+    <div className="relative z-30 flex h-16 flex-none items-center border-b border-slate-200 bg-white">
+      <div className="flex h-16 w-72 flex-none items-center gap-2 border-r border-slate-200 px-3">
+        <button onClick={() => setProjectModal({ open: true, mode: 'create', project: null })} className="inline-flex h-9 flex-1 items-center justify-center gap-2 rounded-full bg-indigo-600 px-4 text-sm font-semibold text-white hover:bg-indigo-700"><Plus className="h-4 w-4" /> New project</button>
+      </div>
+      <div className="flex min-w-0 flex-1 items-center justify-between gap-4 px-5">
+        {selected ? <><div className="flex min-w-0 items-center gap-2"><span className={`h-2.5 w-2.5 flex-none rounded-full ${(STATUS[selected.status] || STATUS.planning)[1]}`} /><h1 className="truncate text-lg font-semibold tracking-tight">{selected.title}</h1><span className="hidden rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-500 sm:inline">{(STATUS[selected.status] || STATUS.planning)[0]}</span><button onClick={() => setProjectModal({ open: true, mode: 'edit', project: selected })} className="grid h-8 w-8 flex-none place-items-center rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-indigo-700" title="Edit project"><Edit3 className="h-3.5 w-3.5" /></button></div><div className="flex flex-none items-center gap-2">{selected.status !== 'completed' ? <button onClick={() => updateProject({ ...selected, status: 'completed' })} className="inline-flex h-9 items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 text-sm font-semibold text-emerald-700"><CheckCircle2 className="h-4 w-4" /> Complete</button> : <button onClick={() => updateProject({ ...selected, status: 'in_progress' })} className="h-9 rounded-full border border-indigo-200 bg-indigo-50 px-3 text-sm font-semibold text-indigo-700">Reopen</button>}<button onClick={() => askDelete('project', selected, async () => { await deleteProject(selected.id); setSelectedId(null) })} className="grid h-9 w-9 place-items-center rounded-full border border-slate-200 text-slate-500 hover:bg-rose-50 hover:text-rose-600" title="Delete project"><Trash2 className="h-4 w-4" /></button></div></> : <span className="text-sm text-slate-500">Select or create a project</span>}
+      </div>
+    </div>
+
+    <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[288px_minmax(0,1fr)]">
+      <aside className="min-h-0 overflow-y-auto border-b border-slate-200 bg-white lg:border-b-0 lg:border-r" aria-label="Projects">
+        <div className="flex h-12 items-center justify-between gap-2 border-b border-slate-200 px-3"><Select value={statusFilter} onChange={setStatusFilter} options={[{ value: 'open', label: 'Open projects' }, { value: 'all', label: 'All projects' }, { value: 'planning', label: 'Planning' }, { value: 'in_progress', label: 'In progress' }, { value: 'on_hold', label: 'On hold' }, { value: 'completed', label: 'Completed' }]} ariaLabel="Filter projects" className="min-w-0 flex-1" triggerClassName="h-8 text-xs font-semibold" menuClassName="w-44" /><span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{filteredProjects.length}</span></div>
+        {loading ? <p className="p-5 text-center text-sm text-slate-500">Loading projects…</p> : filteredProjects.length ? <div className="divide-y divide-slate-100">{filteredProjects.map(project => {
+          const ownTasks = tasks.filter(task => task.project_id === project.id), done = ownTasks.filter(task => task.status === 'completed').length
+          const projectProgress = ownTasks.length ? Math.round(done / ownTasks.length * 100) : Number(project.progress || 0)
+          return <button key={project.id} onClick={() => setSelectedId(project.id)} className={`relative flex w-full flex-col gap-2 px-4 py-3 text-left transition-colors ${selectedId === project.id ? 'bg-indigo-50/70' : 'hover:bg-slate-50'}`}>{selectedId === project.id && <span className="absolute inset-y-0 left-0 w-0.5 bg-indigo-500" />}<span className={`line-clamp-2 text-sm font-semibold ${selectedId === project.id ? 'text-indigo-800' : 'text-slate-800'}`}>{project.title}</span><span className="flex items-center gap-2 text-xs text-slate-500"><span className={`h-2 w-2 rounded-full ${(STATUS[project.status] || STATUS.planning)[1]}`} />{(STATUS[project.status] || STATUS.planning)[0]}<span className="ml-auto">{projectProgress}%</span></span><span className="h-1 overflow-hidden rounded-full bg-slate-100"><span className="block h-full rounded-full bg-indigo-500" style={{ width: `${Math.min(projectProgress, 100)}%` }} /></span></button>
+        })}</div> : <p className="px-4 py-8 text-center text-sm text-slate-500">No projects in this view.</p>}
+      </aside>
+
+      <main className="flex min-h-0 min-w-0 flex-col">
+        {!selected ? <div className="flex flex-1 flex-col items-center justify-center text-center"><FolderKanban className="h-8 w-8 text-slate-300" /><p className="mt-3 text-sm font-semibold text-slate-700">No project selected</p><p className="mt-1 text-xs text-slate-500">Choose a project or create a new one.</p></div> : <>
+          <div className="flex flex-none flex-wrap items-center gap-x-7 gap-y-2 border-b border-slate-200 bg-white px-5 py-3 text-sm">
+            <span className="inline-flex items-center gap-2 text-slate-600"><Flag className="h-4 w-4 text-indigo-600" />{(PRIORITY[selected.priority] || PRIORITY.medium)[0]}</span>
+            <span className={`inline-flex items-center gap-2 ${selected.deadline && selected.status !== 'completed' && isOverdue(selected.deadline) ? 'font-semibold text-rose-600' : 'text-slate-600'}`}><CalendarDays className="h-4 w-4 text-indigo-600" />{selected.deadline ? formatDate(selected.deadline) : 'No deadline'}</span>
+            <span className="inline-flex items-center gap-2 text-slate-600"><Clock3 className="h-4 w-4 text-indigo-600" />{projectTasks.length - completedTasks} open tasks</span>
+            <div className="ml-auto flex w-48 items-center gap-2"><span className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100"><span className="block h-full rounded-full bg-indigo-500" style={{ width: `${Math.min(progress, 100)}%` }} /></span><span className="text-xs font-semibold text-indigo-700">{progress}%</span></div>
+          </div>
+          {actionError && <p className="mx-5 mt-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">{actionError}</p>}
+          <div className="flex h-12 flex-none items-end gap-1 border-b border-slate-200 bg-white px-5">{[['overview', 'Overview', Circle, null], ['tasks', 'Tasks', ListTodo, projectTasks.length], ['pages', 'Pages', FileText, linkedPages.length]].map(([value, label, Icon, count]) => <button key={value} onClick={() => setTab(value)} className={`relative inline-flex h-12 items-center gap-2 px-3 text-sm font-medium ${tab === value ? 'text-indigo-700' : 'text-slate-700 hover:text-slate-900'}`}><Icon className="h-4 w-4" />{label}{count != null && <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${tab === value ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100'}`}>{count}</span>}{tab === value && <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-indigo-500" />}</button>)}</div>
+          <section className="no-scrollbar min-h-0 flex-1 overflow-y-auto bg-slate-100 p-4">
+            {tab === 'overview' && <Overview project={selected} tasks={projectTasks} pages={linkedPages} onEdit={() => setProjectModal({ open: true, mode: 'edit', project: selected })} onAddTask={() => setTaskPanel({ open: true, task: null, mode: 'create' })} onOpenTask={task => setTaskPanel({ open: true, task, mode: 'edit' })} onToggleTask={toggleTask} onTasks={() => setTab('tasks')} onPages={() => setTab('pages')} />}
+            {tab === 'tasks' && <TasksPanel tasks={visibleTasks} filter={taskFilter} setFilter={setTaskFilter} onAdd={() => setTaskPanel({ open: true, task: null, mode: 'create' })} onOpen={task => setTaskPanel({ open: true, task, mode: 'edit' })} onToggle={toggleTask} onDelete={task => askDelete('task', task, () => deleteTask(task.id))} />}
+            {tab === 'pages' && <PagesPanel pages={linkedPages} selectedPage={selectedPage} setSelectedPageId={setSelectedPageId} pagesLoading={pagesLoading} pickerOpen={pagePickerOpen} setPickerOpen={setPagePickerOpen} pageSearch={pageSearch} setPageSearch={setPageSearch} availablePages={availablePages} busy={busy} onLink={linkPage} onUnlink={unlinkPage} onOpen={page => onOpenPage?.(page)} onNew={openPagesForProject} />}
+          </section>
+        </>}
+      </main>
+    </div>
+
+    <ProjectModal isOpen={projectModal.open} mode={projectModal.mode} project={projectModal.project} onClose={() => setProjectModal(v => ({ ...v, open: false }))} onSave={savedProject => { upsertProject(savedProject); setSelectedId(savedProject.id) }} onDelete={projectModal.mode === 'edit' ? id => { if (selectedId === id) setSelectedId(null); loadProjects() } : null} />
+    <TaskSidePanel isOpen={taskPanel.open} onClose={() => setTaskPanel(v => ({ ...v, open: false }))} task={taskPanel.task} mode={taskPanel.mode} projects={projects} initialProjectId={selected?.id} onSave={() => setTaskPanel(v => ({ ...v, open: false }))} onUpdateTask={updateTask} onCreateTask={createTask} onDelete={deleteTask} runningActivity={runningActivity} onActivityStarted={onActivityStarted} onActivityStopped={onActivityStopped} />
+    <ConfirmModal isOpen={!!confirm.open} {...confirm} onCancel={() => setConfirm({ open: false })} />
+  </div>
+}
+
+function Overview({ project, tasks, pages, onEdit, onAddTask, onOpenTask, onToggleTask, onTasks, onPages }) {
+  const open = tasks.filter(task => task.status !== 'completed')
+  return <div className="mx-auto grid max-w-6xl gap-4 xl:grid-cols-[minmax(0,1fr)_320px]"><div className="space-y-4"><div className="rounded-xl border border-slate-200 bg-white p-5"><div className="flex justify-between"><h2 className="text-sm font-semibold">Project brief</h2><button onClick={onEdit} className="text-xs font-semibold text-indigo-700">Edit</button></div><p className="mt-3 whitespace-pre-wrap text-sm leading-6 text-slate-600">{project.description || 'Add a short description that defines the outcome, scope, and what done looks like.'}</p></div><div className="overflow-hidden rounded-xl border border-slate-200 bg-white"><div className="flex items-center justify-between border-b border-slate-200 px-4 py-3"><div><h2 className="text-sm font-semibold">Next actions</h2><p className="text-xs text-slate-500">The work that moves this project forward.</p></div><button onClick={onAddTask} className="inline-flex h-8 items-center gap-1 rounded-full bg-indigo-600 px-3 text-xs font-semibold text-white"><Plus className="h-3.5 w-3.5" /> Add task</button></div>{open.slice(0, 5).map(task => <TaskRow key={task.id} task={task} onToggle={onToggleTask} onOpen={() => onOpenTask(task)} />)}{!open.length && <Empty icon={CheckCircle2} title="No open tasks" copy="Add the next action for this project." />}{open.length > 5 && <button onClick={onTasks} className="m-4 text-xs font-semibold text-indigo-700">View all open tasks →</button>}</div></div><aside className="overflow-hidden rounded-xl border border-slate-200 bg-white self-start"><div className="flex items-center justify-between border-b border-slate-200 px-4 py-3"><div><h2 className="text-sm font-semibold">Linked pages</h2><p className="text-xs text-slate-500">Plans, notes, and decisions</p></div><button onClick={onPages} className="text-xs font-semibold text-indigo-700">Manage</button></div>{pages.slice(0, 5).map(page => <button key={page.id} onClick={onPages} className="flex w-full items-center gap-3 border-b border-slate-100 px-4 py-3 text-left last:border-0 hover:bg-slate-50"><FileText className="h-4 w-4 text-indigo-500" /><span className="min-w-0 flex-1 truncate text-sm font-medium">{page.title}</span></button>)}{!pages.length && <Empty icon={FileText} title="No linked pages" copy="Connect project notes and plans here." />}</aside></div>
+}
+
+function TasksPanel({ tasks, filter, setFilter, onAdd, onOpen, onToggle, onDelete }) { return <div className="mx-auto max-w-5xl overflow-hidden rounded-xl border border-slate-200 bg-white"><div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3"><div className="flex gap-1">{[['open', 'Open'], ['todo', 'To do'], ['in_progress', 'In progress'], ['completed', 'Completed'], ['all', 'All']].map(([value, label]) => <button key={value} onClick={() => setFilter(value)} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${filter === value ? 'bg-indigo-100 text-indigo-700' : 'text-slate-500 hover:bg-slate-100'}`}>{label}</button>)}</div><button onClick={onAdd} className="inline-flex h-8 items-center gap-1 rounded-full bg-indigo-600 px-3 text-xs font-semibold text-white"><Plus className="h-3.5 w-3.5" /> Add task</button></div>{tasks.map(task => <TaskRow key={task.id} task={task} onToggle={onToggle} onOpen={() => onOpen(task)} onDelete={() => onDelete(task)} />)}{!tasks.length && <Empty icon={ListTodo} title="No tasks in this view" copy="Add a task or choose another filter." />}</div> }
+
+function PagesPanel({ pages, pagesLoading, pickerOpen, setPickerOpen, pageSearch, setPageSearch, availablePages, busy, onLink, onUnlink, onOpen, onNew }) {
+  return <div className="mx-auto max-w-5xl overflow-visible rounded-xl border border-slate-200 bg-white">
+    <div className="relative z-10 flex min-h-14 flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+      <div><h2 className="text-sm font-semibold text-slate-900">Linked pages</h2><p className="mt-0.5 text-xs text-slate-500">{pages.length} {pages.length === 1 ? 'page' : 'pages'} connected to this project</p></div>
+      <div className="flex items-center gap-2">
+        <button onClick={onNew} className="inline-flex h-8 items-center gap-1.5 rounded-full border border-slate-200 px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"><Plus className="h-3.5 w-3.5" /> New in Pages</button>
+        <div className="relative"><button onClick={() => setPickerOpen(!pickerOpen)} disabled={busy} className="inline-flex h-8 items-center gap-1.5 rounded-full bg-indigo-600 px-3 text-xs font-semibold text-white hover:bg-indigo-700 disabled:opacity-50"><Link2 className="h-3.5 w-3.5" /> Link page</button>{pickerOpen && <div className="absolute right-0 top-10 z-30 w-72 rounded-xl border border-slate-200 bg-white p-2 shadow-xl"><div className="flex items-center gap-2"><input value={pageSearch} onChange={e => setPageSearch(e.target.value)} placeholder="Find an unassigned page" autoFocus className="h-9 min-w-0 flex-1 rounded-full border border-slate-200 px-3 text-sm outline-none focus:border-indigo-400" /><button onClick={() => setPickerOpen(false)} className="grid h-8 w-8 place-items-center rounded-full hover:bg-slate-100"><X className="h-4 w-4" /></button></div><div className="mt-2 max-h-64 overflow-y-auto">{pagesLoading ? <p className="p-3 text-xs text-slate-500">Loading pages…</p> : availablePages.length ? availablePages.map(page => <button key={page.id} onClick={() => onLink(page)} className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-indigo-50"><FileText className="h-4 w-4 text-slate-400" /><span className="truncate">{page.title}</span></button>) : <p className="p-3 text-xs text-slate-500">No unassigned pages found.</p>}</div></div>}</div>
+      </div>
+    </div>
+    {pages.length ? <div className="divide-y divide-slate-100">{pages.map(page => <div key={page.id} className="group flex min-h-14 items-center gap-3 px-4 py-2.5 hover:bg-slate-50"><span className="grid h-8 w-8 flex-none place-items-center rounded-lg bg-indigo-50 text-indigo-600"><FileText className="h-4 w-4" /></span><button onClick={() => onOpen(page)} className="min-w-0 flex-1 text-left"><span className="block truncate text-sm font-semibold text-slate-800 group-hover:text-indigo-700">{page.title}</span><span className="mt-0.5 block text-xs capitalize text-slate-500">{(page.page_type || 'general').replace('_', ' ')} · {(page.status || 'active').replace('_', ' ')}</span></button><span className="hidden text-xs text-slate-400 sm:block">Updated {new Date(page.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span><button onClick={() => onOpen(page)} className="h-8 rounded-full border border-slate-200 px-3 text-xs font-semibold text-slate-600 opacity-0 transition-opacity hover:border-indigo-200 hover:text-indigo-700 group-hover:opacity-100 group-focus-within:opacity-100">Open</button><button onClick={() => onUnlink(page)} disabled={busy} className="grid h-8 w-8 place-items-center rounded-full text-slate-400 opacity-0 transition-opacity hover:bg-rose-50 hover:text-rose-600 group-hover:opacity-100 group-focus-within:opacity-100" title="Unlink page"><Unlink2 className="h-3.5 w-3.5" /></button></div>)}</div> : <div className="flex min-h-52 flex-col items-center justify-center text-center"><FileText className="h-7 w-7 text-slate-300" /><p className="mt-3 text-sm font-semibold text-slate-700">No linked pages</p><p className="mt-1 max-w-sm text-xs text-slate-500">Create project notes in Pages, or link an existing unassigned page.</p></div>}
+  </div>
+}
+
+function TaskRow({ task, onToggle, onOpen, onDelete }) { const priority = PRIORITY[task.priority] || PRIORITY.medium; return <div className="group flex min-h-14 items-center gap-3 border-b border-slate-100 px-4 py-2 last:border-0 hover:bg-slate-50"><button onClick={() => onToggle(task)} className={`grid h-5 w-5 place-items-center rounded-full border ${task.status === 'completed' ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-slate-300 text-transparent'}`}><Check className="h-3 w-3" /></button><button onClick={onOpen} className={`min-w-0 flex-1 truncate text-left text-sm font-medium hover:text-indigo-700 ${task.status === 'completed' ? 'text-slate-400 line-through' : 'text-slate-800'}`}>{task.title}</button><span className="inline-flex items-center gap-1.5 text-xs text-slate-500"><span className={`h-2 w-2 rounded-full ${priority[1]}`} />{priority[0]}</span>{task.due_date && <span className="hidden text-xs text-slate-500 sm:inline">{formatDate(task.due_date)}</span>}{onDelete && <button onClick={onDelete} className="rounded-full p-1.5 text-slate-300 opacity-0 hover:text-rose-600 group-hover:opacity-100"><Trash2 className="h-3.5 w-3.5" /></button>}</div> }
+function Empty({ icon: Icon, title, copy }) { return <div className="flex min-h-40 flex-col items-center justify-center px-5 py-7 text-center"><Icon className="h-6 w-6 text-slate-300" /><p className="mt-3 text-sm font-semibold text-slate-700">{title}</p><p className="mt-1 text-xs text-slate-500">{copy}</p></div> }
 
 export default ProjectsPage

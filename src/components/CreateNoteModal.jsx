@@ -4,7 +4,7 @@ import { invoke } from '@tauri-apps/api/core'
 import TipTapEditor from './TipTapEditor'
 import Dropdown from './ui/Dropdown'
 
-function CreateNoteModal({ isOpen, onClose, onNoteCreated, note = null }) {
+function CreateNoteModal({ isOpen, onClose, onNoteCreated, note = null, initialProjectId = null }) {
   const [title, setTitle] = useState('Untitled Note')
   const [content, setContent] = useState('')
   const [noteType, setNoteType] = useState('general')
@@ -31,11 +31,11 @@ function CreateNoteModal({ isOpen, onClose, onNoteCreated, note = null }) {
         setTitle('Untitled Note')
         setContent('')
         setNoteType('general')
-        setProjectId(null)
+        setProjectId(initialProjectId)
         setIsFullScreen(false)
       }
     }
-  }, [isOpen, note])
+  }, [isOpen, note, initialProjectId])
 
   // Close dropdown when clicking outside
   useEffect(() => {

@@ -1,5 +1,7 @@
+use crate::database::models::task_checklist::{
+    CreateTaskChecklistItemRequest, TaskChecklistItem, UpdateTaskChecklistItemRequest,
+};
 use sqlx::{Pool, Sqlite};
-use crate::database::models::task_checklist::{TaskChecklistItem, CreateTaskChecklistItemRequest, UpdateTaskChecklistItemRequest};
 
 pub async fn create_checklist_item(
     pool: &Pool<Sqlite>,
@@ -93,10 +95,7 @@ pub async fn update_checklist_item(
     Ok(item)
 }
 
-pub async fn delete_checklist_item(
-    pool: &Pool<Sqlite>,
-    id: i64,
-) -> Result<(), sqlx::Error> {
+pub async fn delete_checklist_item(pool: &Pool<Sqlite>, id: i64) -> Result<(), sqlx::Error> {
     let result = sqlx::query(
         r#"
         DELETE FROM task_checklist_items WHERE id = ?1

@@ -1,519 +1,97 @@
-import React, { useState, useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { Check, Trash2, X } from 'lucide-react'
 import { invoke } from '@tauri-apps/api/core'
-import { X, ChevronDown, Calendar, Flag, AlignLeft, Target, Check, Trash2, Star } from 'lucide-react'
-import DateTimePicker from './DateTimePicker'
+import DatePickerField from './DatePickerField'
 
-function ProjectModal({ 
-  isOpen, 
-  onClose, 
-  project = null,
-  mode = 'create', // 'create' | 'edit'
-  onSave,
-  onDelete = null
-}) {
-  const modalRef = useRef(null)
-  const isEditMode = mode === 'edit'
-  
-  useEffect(() => {
-    if (isOpen) {
-      if (isEditMode && project) {
-        setFormData({
-          title: project.title || '',
-          description: project.description || '',
-          start_date: project.start_date || new Date().toISOString().split('T')[0],
-          deadline: project.deadline || '',
-          priority: project.priority || 'medium',
-          progress: project.progress || 0,
-          status: project.status || 'planning'
-        })
-      } else {
-        setFormData({
-          title: '',
-          description: '',
-          start_date: new Date().toISOString().split('T')[0],
-          deadline: '',
-          priority: 'medium',
-          progress: 0,
-          status: 'planning'
-        })
-        // Focus on title input when modal opens in create mode
-        setTimeout(() => {
-          const titleInput = document.getElementById('project-title-input')
-          if (titleInput) titleInput.focus()
-        }, 100)
-      }
-      setErrors({})
-    }
-  }, [isOpen, project, isEditMode])
+const blank = () => ({ title: '', description: '', start_date: new Date().toISOString().split('T')[0], deadline: '', priority: 'medium', progress: 0, status: 'planning' })
+const statuses = [['planning', 'Planning', 'bg-violet-500'], ['in_progress', 'In progress', 'bg-blue-500'], ['on_hold', 'On hold', 'bg-amber-500'], ['completed', 'Completed', 'bg-emerald-500']]
+const priorities = [['high', 'High', 'bg-rose-500'], ['medium', 'Medium', 'bg-amber-500'], ['low', 'Low', 'bg-emerald-500']]
 
-  const [formData, setFormData] = useState({
-    title: '',
-    description: '',
-    start_date: new Date().toISOString().split('T')[0],
-    deadline: '',
-    priority: 'medium',
-    progress: 0,
-    status: 'planning'
-  })
-
+function ProjectModal({ isOpen, onClose, project = null, mode = 'create', onSave, onDelete }) {
+  const isEdit = mode === 'edit'
+  const titleRef = useRef(null)
+  const [form, setForm] = useState(blank)
+  const [snapshot, setSnapshot] = useState('')
   const [errors, setErrors] = useState({})
-  const [isLoading, setIsLoading] = useState(false)
-  const [showPriorityDropdown, setShowPriorityDropdown] = useState(false)
-  const [showStartDatePicker, setShowStartDatePicker] = useState(false)
-  const [showDeadlinePicker, setShowDeadlinePicker] = useState(false)
-  const [showStatusDropdown, setShowStatusDropdown] = useState(false)
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
-  // Close dropdowns when clicking outside
   useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (modalRef.current && !modalRef.current.contains(e.target)) {
-        setShowPriorityDropdown(false)
-        setShowStartDatePicker(false)
-        setShowDeadlinePicker(false)
-        setShowStatusDropdown(false)
-        setShowDeleteConfirm(false)
-      }
-    }
-    
-    if (showPriorityDropdown || showStartDatePicker || showDeadlinePicker || showStatusDropdown || showDeleteConfirm) {
-      document.addEventListener('mousedown', handleClickOutside, true)
-      return () => document.removeEventListener('mousedown', handleClickOutside, true)
-    }
-  }, [showPriorityDropdown, showStartDatePicker, showDeadlinePicker, showStatusDropdown, showDeleteConfirm])
+    if (!isOpen) return
+    const next = isEdit && project ? { title: project.title || '', description: project.description || '', start_date: project.start_date || new Date().toISOString().split('T')[0], deadline: project.deadline || '', priority: project.priority || 'medium', progress: project.progress || 0, status: project.status || 'planning' } : blank()
+    setForm(next); setSnapshot(JSON.stringify(next)); setErrors({}); setConfirmDelete(false)
+    setTimeout(() => { titleRef.current?.focus(); if (!isEdit) titleRef.current?.select() }, 0)
+  }, [isOpen, isEdit, project])
 
-  const validateForm = () => {
-    const newErrors = {}
-    if (!formData.title.trim()) {
-      newErrors.title = 'Project title is required'
-    }
-    if (!formData.start_date) {
-      newErrors.start_date = 'Start date is required'
-    }
-    if (!formData.deadline) {
-      newErrors.deadline = 'Deadline is required'
-    }
-    if (formData.start_date && formData.deadline) {
-      if (new Date(formData.start_date) > new Date(formData.deadline)) {
-        newErrors.deadline = 'Deadline must be after start date'
-      }
-    }
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
+  const dirty = JSON.stringify(form) !== snapshot
+  const change = (field, value) => { setForm(current => ({ ...current, [field]: value })); if (errors[field]) setErrors(current => ({ ...current, [field]: '' })) }
+  const validate = () => {
+    const next = {}
+    if (!form.title.trim()) next.title = 'Project name is required'
+    if (!form.start_date) next.start_date = 'Start date is required'
+    if (!form.deadline) next.deadline = 'Deadline is required'
+    if (form.start_date && form.deadline && new Date(form.start_date) > new Date(form.deadline)) next.deadline = 'Deadline must be after the start date'
+    setErrors(next); return !Object.keys(next).length
   }
-
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    if (!validateForm()) return
-
-    setIsLoading(true)
+  const submit = async event => {
+    event?.preventDefault()
+    if (!validate() || saving) return
+    setSaving(true)
     try {
-      const response = isEditMode
-        ? await invoke('update_project', { request: { ...formData, id: project.id } })
-        : await invoke('create_project', { request: formData })
-        
-      if (response.success) {
-        onSave(response.data)
-        onClose()
-      } else {
-        setErrors({ submit: response.error })
-      }
-    } catch (error) {
-      setErrors({ submit: error.toString() })
-    } finally {
-      setIsLoading(false)
-    }
+      const request = { ...form, title: form.title.trim(), ...(isEdit ? { id: project.id } : {}) }
+      const response = await invoke(isEdit ? 'update_project' : 'create_project', { request })
+      if (!response.success) setErrors({ submit: response.error || 'Could not save project' })
+      else { onSave?.(response.data); window.dispatchEvent(new CustomEvent('projects-change', { detail: response.data })); onClose() }
+    } catch (error) { setErrors({ submit: error?.toString?.() || 'Could not save project' }) }
+    finally { setSaving(false) }
   }
-
-  const handleDelete = async () => {
-    if (!onDelete || !project) return
-    
-    setIsLoading(true)
+  const remove = async () => {
+    if (!project || !onDelete || deleting) return
+    setDeleting(true)
     try {
       const response = await invoke('delete_project', { id: project.id })
-      if (response.success) {
-        onDelete(project.id)
-        onClose()
-      } else {
-        setErrors({ submit: response.error })
-      }
-    } catch (error) {
-      setErrors({ submit: error.toString() })
-    } finally {
-      setIsLoading(false)
-      setShowDeleteConfirm(false)
-    }
+      if (!response.success) setErrors({ submit: response.error || 'Could not delete project' })
+      else { onDelete(project.id); onClose() }
+    } catch (error) { setErrors({ submit: error?.toString?.() || 'Could not delete project' }) }
+    finally { setDeleting(false); setConfirmDelete(false) }
   }
 
-  const handleChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
-    if (errors[field]) {
-      setErrors(prev => ({ ...prev, [field]: '' }))
-    }
-  }
+  useEffect(() => {
+    if (!isOpen) return undefined
+    const keydown = event => { if (event.key === 'Escape' && !confirmDelete) onClose(); if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') submit(event) }
+    document.addEventListener('keydown', keydown)
+    return () => document.removeEventListener('keydown', keydown)
+  }, [isOpen, form, confirmDelete, saving])
 
-  const toggleStatus = () => {
-    const statusFlow = {
-      'planning': 'in_progress',
-      'in_progress': 'on_hold',
-      'on_hold': 'completed',
-      'completed': 'planning'
-    }
-    const newStatus = statusFlow[formData.status] || 'planning'
-    handleChange('status', newStatus)
-  }
+  if (!isOpen || (isEdit && !project)) return null
+  return <>
+    <div className="fixed inset-0 z-[55] bg-slate-950/35" onClick={onClose} />
+    <form onSubmit={submit} className="fixed left-1/2 top-1/2 z-[60] flex h-[min(640px,calc(100vh-32px))] w-[780px] max-w-[calc(100vw-32px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl animate-scale-in">
+      <header className="flex-none border-b border-slate-200 px-6 py-3">
+        <div className="flex items-start gap-4"><div className="min-w-0 flex-1"><div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">{isEdit ? 'Project details' : 'New project'}</div><input ref={titleRef} id="project-title-input" value={form.title} onChange={event => change('title', event.target.value)} placeholder="Project name" className="w-full border-none bg-transparent text-xl font-semibold tracking-tight text-slate-900 outline-none placeholder:text-slate-400 focus:ring-0" />{errors.title && <p className="mt-1 text-xs font-medium text-red-500">{errors.title}</p>}</div><button type="button" onClick={onClose} className="grid h-8 w-8 flex-none place-items-center rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50" aria-label="Close panel"><X className="h-4 w-4" /></button></div>
+        <div className="mt-3 flex flex-wrap items-center gap-1.5"><span className="mr-1 text-[11px] font-semibold text-slate-400">Quick set</span><QuickButton onClick={() => { const date = new Date(); date.setDate(date.getDate() + 7); change('deadline', date.toISOString().split('T')[0]) }}>+1 week</QuickButton><QuickButton onClick={() => { const date = new Date(); date.setMonth(date.getMonth() + 1); change('deadline', date.toISOString().split('T')[0]) }}>+1 month</QuickButton><button type="button" onClick={() => change('priority', 'high')} className="h-7 rounded-full border border-rose-200 bg-rose-50 px-2.5 text-xs font-semibold text-rose-700 hover:bg-rose-100">High priority</button></div>
+      </header>
 
-  const getPriorityLabel = (priority) => {
-    const labels = { high: 'High', medium: 'Medium', low: 'Low' }
-    return labels[priority] || 'Medium'
-  }
-
-  const getPriorityColor = (priority) => {
-    switch (priority) {
-      case 'high': return 'text-red-500 border-red-500 bg-red-50 dark:bg-red-900/20'
-      case 'medium': return 'text-yellow-500 border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20'
-      case 'low': return 'text-blue-500 border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-      default: return 'text-gray-400 border-gray-300'
-    }
-  }
-
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'completed':
-        return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-700'
-      case 'in_progress':
-        return 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-700'
-      case 'on_hold':
-        return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 border-yellow-200 dark:border-yellow-700'
-      default:
-        return 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600'
-    }
-  }
-
-  const getStatusLabel = (status) => {
-    const labels = {
-      'planning': 'Planning',
-      'in_progress': 'In Progress',
-      'on_hold': 'On Hold',
-      'completed': 'Completed'
-    }
-    return labels[status] || 'Planning'
-  }
-
-  const formatDate = (dateString) => {
-    if (!dateString) return 'No date set'
-    const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', { 
-      weekday: 'short', 
-      month: 'short', 
-      day: 'numeric',
-      year: 'numeric'
-    })
-  }
-
-  const handleQuickAdd = (type) => {
-    switch (type) {
-      case 'week':
-        const weekFromNow = new Date()
-        weekFromNow.setDate(weekFromNow.getDate() + 7)
-        handleChange('deadline', weekFromNow.toISOString().split('T')[0])
-        break
-      case 'month':
-        const monthFromNow = new Date()
-        monthFromNow.setMonth(monthFromNow.getMonth() + 1)
-        handleChange('deadline', monthFromNow.toISOString().split('T')[0])
-        break
-      case 'quarter':
-        const quarterFromNow = new Date()
-        quarterFromNow.setMonth(quarterFromNow.getMonth() + 3)
-        handleChange('deadline', quarterFromNow.toISOString().split('T')[0])
-        break
-      case 'high':
-        handleChange('priority', 'high')
-        break
-      case 'low':
-        handleChange('priority', 'low')
-        break
-    }
-  }
-
-  if (!isOpen || (isEditMode && !project)) return null
-
-  return (
-    <>
-      {/* Backdrop */}
-      <div 
-        className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 transition-opacity"
-        onClick={onClose}
-      />
-      
-      {/* Side Panel - Floating with rounded corners */}
-      <div ref={modalRef} className="fixed right-4 top-4 bottom-4 w-[520px] bg-white dark:bg-gray-800 shadow-2xl z-50 flex flex-col border border-gray-200 dark:border-gray-700 rounded-2xl overflow-hidden animate-slide-in-right">
-        <form onSubmit={handleSubmit} className="flex flex-col h-full">
-          {/* Header */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-2 text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <div className="flex items-center gap-3">
-              <button type="button" className="p-2 text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors">
-                <Star className="w-4 h-4" />
-              </button>
-              {isEditMode && onDelete && (
-                <button
-                  type="button"
-                  onClick={() => setShowDeleteConfirm(true)}
-                  className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Content */}
-          <div className="flex-1 overflow-y-auto">
-            {/* Project Title */}
-            <div className="px-6 py-5">
-              <input
-                id="project-title-input"
-                type="text"
-                value={formData.title}
-                onChange={(e) => handleChange('title', e.target.value)}
-                placeholder="Project name"
-                className="w-full text-2xl font-semibold text-gray-900 dark:text-white placeholder-gray-400 bg-transparent border-none focus:outline-none focus:ring-0"
-              />
-              {errors.title && (
-                <p className="mt-2 text-xs text-red-500">{errors.title}</p>
-              )}
-            </div>
-
-            {/* Properties List */}
-            <div className="px-6 pb-6 space-y-4">
-              {/* Description */}
-              <div className="flex items-start">
-                <div className="w-32 flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                  <AlignLeft className="w-4 h-4" />
-                  <span>Description</span>
-                </div>
-                <div className="flex-1">
-                  <textarea
-                    name="description"
-                    value={formData.description}
-                    onChange={(e) => handleChange('description', e.target.value)}
-                    placeholder="Describe the project..."
-                    rows={5}
-                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-gray-900 dark:focus:ring-gray-400 focus:border-gray-900 text-gray-900 dark:text-white placeholder-gray-400 resize-none transition-colors"
-                  />
-                </div>
-              </div>
-
-              {/* Status - Edit Mode Only */}
-              {isEditMode && (
-                <div className="flex items-center">
-                  <div className="w-32 flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                    <Check className="w-4 h-4" />
-                    <span>Status</span>
-                  </div>
-                  <div className="flex-1 relative dropdown-container">
-                    <button
-                      type="button"
-                      onClick={() => setShowStatusDropdown(!showStatusDropdown)}
-                      className={`flex items-center gap-2 px-3 py-2 text-sm font-medium border rounded-xl transition-colors ${getStatusBadge(formData.status)}`}
-                    >
-                      {getStatusLabel(formData.status)}
-                    </button>
-                    {showStatusDropdown && (
-                      <div className="absolute top-full left-0 mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-10 min-w-[160px]">
-                        {['planning', 'in_progress', 'on_hold', 'completed'].map(status => (
-                          <button
-                            key={status}
-                            type="button"
-                            onClick={() => { handleChange('status', status); setShowStatusDropdown(false); }}
-                            className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${formData.status === status ? 'text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}
-                          >
-                            {getStatusLabel(status)}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Start Date */}
-              <div className="flex items-center">
-                <div className="w-32 flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                  <Calendar className="w-4 h-4" />
-                  <span>Start Date</span>
-                </div>
-                <div className="flex-1 relative">
-                  <button
-                    type="button"
-                    onClick={() => setShowStartDatePicker(!showStartDatePicker)}
-                    className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-sm font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-left"
-                  >
-                    {formData.start_date ? formatDate(formData.start_date) : 'Select date'}
-                  </button>
-                  {showStartDatePicker && (
-                    <div 
-                      className="absolute top-full left-0 right-0 mt-2 z-10"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <DateTimePicker
-                        value={formData.start_date}
-                        onChange={(date) => {
-                          handleChange('start_date', date)
-                          setShowStartDatePicker(false)
-                        }}
-                        onClose={() => setShowStartDatePicker(false)}
-                      />
-                    </div>
-                  )}
-                  {errors.start_date && (
-                    <p className="mt-1 text-xs text-red-500">{errors.start_date}</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Deadline */}
-              <div className="flex items-center">
-                <div className="w-32 flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                  <Target className="w-4 h-4" />
-                  <span>Deadline</span>
-                </div>
-                <div className="flex-1 relative">
-                  <button
-                    type="button"
-                    onClick={() => setShowDeadlinePicker(!showDeadlinePicker)}
-                    className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-sm font-medium rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-left"
-                  >
-                    {formData.deadline ? formatDate(formData.deadline) : 'Select date'}
-                  </button>
-                  {showDeadlinePicker && (
-                    <div 
-                      className="absolute top-full left-0 right-0 mt-2 z-10"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <DateTimePicker
-                        value={formData.deadline}
-                        onChange={(date) => {
-                          handleChange('deadline', date)
-                          setShowDeadlinePicker(false)
-                        }}
-                        onClose={() => setShowDeadlinePicker(false)}
-                      />
-                    </div>
-                  )}
-                  {errors.deadline && (
-                    <p className="mt-1 text-xs text-red-500">{errors.deadline}</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Priority */}
-              <div className="flex items-center">
-                <div className="w-32 flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-                  <Flag className="w-4 h-4" />
-                  <span>Priority</span>
-                </div>
-                <div className="flex-1 relative dropdown-container">
-                  <button
-                    type="button"
-                    onClick={() => setShowPriorityDropdown(!showPriorityDropdown)}
-                    className={`flex items-center gap-2 px-3 py-2 text-sm font-medium border rounded-xl transition-colors ${getPriorityColor(formData.priority)}`}
-                  >
-                    {getPriorityLabel(formData.priority)}
-                    <ChevronDown className={`w-4 h-4 transition-transform ${showPriorityDropdown ? 'rotate-180' : ''}`} />
-                  </button>
-                  {showPriorityDropdown && (
-                    <div className="absolute top-full left-0 mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-10 min-w-[120px]">
-                      {['high', 'medium', 'low'].map(priority => (
-                        <button
-                          key={priority}
-                          type="button"
-                          onClick={() => { handleChange('priority', priority); setShowPriorityDropdown(false); }}
-                          className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors ${formData.priority === priority ? 'text-blue-600 dark:text-blue-400' : 'text-gray-700 dark:text-gray-300'}`}
-                        >
-                          {getPriorityLabel(priority)}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Quick Add Buttons - Create Mode Only */}
-              {!isEditMode && (
-                <div className="flex items-center gap-2 pt-4">
-                  <span className="text-xs text-gray-400">Quick set:</span>
-                  <button type="button" onClick={() => handleQuickAdd('week')} className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded">+1 week</button>
-                  <button type="button" onClick={() => handleQuickAdd('month')} className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded">+1 month</button>
-                  <button type="button" onClick={() => handleQuickAdd('quarter')} className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded">+3 months</button>
-                  <button type="button" onClick={() => handleQuickAdd('high')} className="px-2 py-1 text-xs bg-red-100 text-red-600 hover:bg-red-200 rounded">High priority</button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Footer */}
-          <div className="px-6 py-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between">
-            {errors.submit && (
-              <p className="text-sm text-red-500">{errors.submit}</p>
-            )}
-            <div className="flex items-center gap-3 ml-auto">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="px-6 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-medium rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isLoading ? 'Saving...' : isEditMode ? 'Save Changes' : 'Create Project'}
-              </button>
-            </div>
-          </div>
-        </form>
-      </div>
-
-      {/* Delete Confirmation */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setShowDeleteConfirm(false)} />
-          <div className="relative bg-white dark:bg-gray-800 rounded-xl shadow-xl p-6 w-[400px]">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Delete Project?</h3>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-              Are you sure you want to delete "{project?.title}"? This action cannot be undone.
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={isLoading}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
-              >
-                {isLoading ? 'Deleting...' : 'Delete'}
-              </button>
-            </div>
-          </div>
+      <div className="min-h-0 flex-1 overflow-hidden px-6 py-4"><div className="flex h-full min-h-0">
+        <div className="flex min-h-0 w-[56%] flex-col pr-6"><label className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Description</label><textarea value={form.description} onChange={event => change('description', event.target.value)} placeholder="Describe the outcome, scope, and what done looks like…" className="min-h-[240px] flex-1 resize-none rounded-xl border border-slate-200 bg-[#fffefa] p-4 text-sm leading-6 text-slate-700 outline-none placeholder:text-slate-400 focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100" /></div>
+        <div className="no-scrollbar min-h-0 w-[44%] overflow-y-auto border-l border-slate-200 pl-6 pr-1"><div className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Properties</div>
+          <Property label="Status"><div className="grid grid-cols-2 gap-1.5">{statuses.map(([value, label, dot]) => <Choice key={value} active={form.status === value} onClick={() => change('status', value)} dot={dot}>{label}</Choice>)}</div></Property>
+          <Property label="Priority"><div className="flex flex-wrap gap-1.5">{priorities.map(([value, label, dot]) => <Choice key={value} active={form.priority === value} onClick={() => change('priority', value)} dot={dot}>{label}</Choice>)}</div></Property>
+          <Property label="Start date"><DatePickerField value={form.start_date} onChange={date => change('start_date', date)} placeholder="Select date" ariaLabel="Project start date" compact className="w-full" />{errors.start_date && <p className="mt-1 text-xs text-red-500">{errors.start_date}</p>}</Property>
+          <Property label="Deadline"><DatePickerField value={form.deadline} onChange={date => change('deadline', date)} placeholder="Select date" ariaLabel="Project deadline" compact className="w-full" />{errors.deadline && <p className="mt-1 text-xs text-red-500">{errors.deadline}</p>}</Property>
+          {isEdit && <Property label="Progress"><div className="flex items-center gap-3"><input type="range" min="0" max="100" step="5" value={form.progress} onChange={event => change('progress', Number(event.target.value))} className="min-w-0 flex-1 accent-indigo-600" /><span className="w-10 text-right text-xs font-semibold text-slate-600">{form.progress}%</span></div></Property>}
         </div>
-      )}
-    </>
-  )
+      </div></div>
+
+      <footer className="flex-none border-t border-slate-200 px-6 py-3">{errors.submit && <p className="mb-2 text-right text-xs font-medium text-red-600">{errors.submit}</p>}<div className="flex items-center justify-between gap-4"><div className="flex items-center gap-3">{isEdit && onDelete && <button type="button" onClick={() => setConfirmDelete(true)} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-red-200 px-3.5 text-xs font-semibold text-red-600 hover:bg-red-50"><Trash2 className="h-3.5 w-3.5" />Delete</button>}{dirty && <span className="text-xs font-medium text-amber-600">Unsaved changes</span>}</div><div className="flex items-center gap-2"><button type="button" onClick={onClose} className="h-9 rounded-full border border-slate-200 px-4 text-xs font-semibold text-slate-600 hover:bg-slate-50">Cancel</button><button type="submit" disabled={saving || (isEdit && !dirty)} className="inline-flex h-9 min-w-[132px] items-center justify-center gap-1.5 rounded-full bg-indigo-600 px-4 text-xs font-semibold text-white hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400">{saving ? 'Saving…' : <><Check className="h-4 w-4" />{isEdit ? 'Save changes' : 'Create project'}</>}</button></div></div></footer>
+    </form>
+    {confirmDelete && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/45 p-4" onClick={() => setConfirmDelete(false)}><div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-5 shadow-xl" onClick={event => event.stopPropagation()}><h3 className="text-base font-semibold">Delete project?</h3><p className="mt-2 text-sm leading-5 text-slate-600">“{project?.title}” will be permanently deleted. Its tasks and pages will remain.</p><div className="mt-5 flex justify-end gap-2"><button onClick={() => setConfirmDelete(false)} className="h-9 rounded-full border border-slate-200 px-4 text-xs font-semibold text-slate-600">Cancel</button><button onClick={remove} disabled={deleting} className="h-9 rounded-full bg-red-600 px-4 text-xs font-semibold text-white disabled:opacity-50">{deleting ? 'Deleting…' : 'Delete project'}</button></div></div></div>}
+  </>
 }
+
+function Property({ label, children }) { return <div className="border-b border-slate-200 px-1 py-3 last:border-0"><div className="mb-2 text-xs font-semibold text-slate-500">{label}</div>{children}</div> }
+function Choice({ active, onClick, dot, children }) { return <button type="button" onClick={onClick} className={`flex h-8 items-center gap-1.5 rounded-full border px-2.5 text-xs font-semibold ${active ? 'border-indigo-200 bg-indigo-50 text-indigo-700' : 'border-slate-200 text-slate-500 hover:bg-slate-50'}`}><span className={`h-2 w-2 rounded-full ${dot}`} />{children}</button> }
+function QuickButton({ onClick, children }) { return <button type="button" onClick={onClick} className="h-7 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100">{children}</button> }
 
 export default ProjectModal

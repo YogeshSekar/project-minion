@@ -5,6 +5,8 @@ import useTheme from './hooks/useTheme'
 import useModalState from './hooks/useModalState'
 import useTasks from './hooks/useTasks'
 import useProjects from './hooks/useProjects'
+import usePages from './hooks/usePages'
+import useMeetings from './hooks/useMeetings'
 import Sidebar from './components/Sidebar'
 import UnifiedHeader from './components/UnifiedHeader'
 import SettingsModal from './components/SettingsModal'
@@ -15,21 +17,28 @@ import HomePage from './pages/HomePage'
 import TasksPage from './pages/TasksPage'
 import ProjectsPage from './pages/ProjectsPage'
 import MeetingsPage from './pages/MeetingsPage'
-import MeetingView from './components/MeetingView'
 import NotesPage from './pages/NotesPage'
 import CreateNoteModal from './components/CreateNoteModal'
-import QuickAddTask from './components/QuickAddTask'
-import HabitsPage from './pages/HabitsPage'
-import AnalyticsPage from './pages/AnalyticsPage'
 import AppsPage from './pages/AppsPage'
 import ActivitiesPage from './pages/ActivitiesPage'
+import { startNotificationScheduler } from './services/notificationService'
+import { startBackupScheduler } from './services/backupService'
 import './App.css'
 
 function App() {
   const [activeItem, setActiveItem] = useState('home')
-  const [currentView, setCurrentView] = useState('main') // 'main' or 'meeting-view'
-  const [selectedMeeting, setSelectedMeeting] = useState(null)
+  const [pageToOpen, setPageToOpen] = useState(null)
+  const [meetingToOpen, setMeetingToOpen] = useState(null)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
+  const pageTitle = {
+    home: 'Home',
+    tasks: 'My Task',
+    notes: 'Pages',
+    meetings: 'Meetings',
+    activities: 'Analytics',
+    projects: 'Projects',
+    apps: 'Apps'
+  }[activeItem] || 'Home'
   
   // Use hooks
   const { theme, setTheme, font, setFont } = useTheme()
@@ -40,6 +49,7 @@ function App() {
     isTaskModalOpen,
     taskModalMode,
     selectedTaskForEdit,
+    taskModalOptions,
     openTaskModal,
     closeTaskModal,
     isNoteModalOpen,
@@ -71,13 +81,11 @@ function App() {
     syncActivityStopped
   } = useTimer()
   
-  // New button dropdown state
-  const [isNewDropdownOpen, setIsNewDropdownOpen] = useState(false)
-  const [dropdownTimeout, setDropdownTimeout] = useState(null)
-  
   // Data hooks
   const { tasks, createTask, updateTask, deleteTask } = useTasks()
-  const { projects, createProject, updateProject, deleteProject } = useProjects()
+  const { projects, createProject, updateProject, deleteProject, upsertProject } = useProjects()
+  const { pages: searchPages } = usePages()
+  const { meetings: searchMeetings } = useMeetings()
   const [taskRefreshTrigger, setTaskRefreshTrigger] = useState(0)
   const projectsPageRef = useRef(null)
   
@@ -85,8 +93,8 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('')
   const [isSearchFocused, setIsSearchFocused] = useState(false)
 
-  // Quick Add Task state
-  const [isQuickAddExpanded, setIsQuickAddExpanded] = useState(false)
+  useEffect(() => startNotificationScheduler(), [])
+  useEffect(() => startBackupScheduler(), [])
 
   // Filter tasks due today
   const todayTasks = tasks.filter(task => {
@@ -102,15 +110,11 @@ function App() {
   useEffect(() => {
     const handleClickOutside = (event) => {
       const timerDropdown = document.getElementById('timer-dropdown')
-      const newDropdown = document.getElementById('new-dropdown')
       
       if (timerDropdown && !timerDropdown.contains(event.target)) {
         setIsTimerOpen(false)
       }
       
-      if (newDropdown && !newDropdown.contains(event.target)) {
-        setIsNewDropdownOpen(false)
-      }
     }
 
     document.addEventListener('mousedown', handleClickOutside)
@@ -119,31 +123,15 @@ function App() {
     }
   }, [])
 
-  const handleNewAction = (action) => {
-    setIsNewDropdownOpen(false)
-    const page = action || activeItem
-    if (page === 'task' || page === 'tasks') openTaskModal()
-    else if (page === 'note' || page === 'notes') openNoteModal()
-    else if (page === 'project' || page === 'projects') openProjectModal()
-  }
-
   const handleCloseTaskModal = () => {
     closeTaskModal()
     setTaskRefreshTrigger(prev => prev + 1)
   }
 
   const handleSaveTask = () => setTaskRefreshTrigger(prev => prev + 1)
-  const handleSaveProject = () => {}
-
-  const navigateToMeeting = (meeting) => {
-    setSelectedMeeting(meeting)
-    setCurrentView('meeting-view')
-  }
-
-  const exitMeetingView = () => {
-    setSelectedMeeting(null)
-    setCurrentView('main')
-    setActiveItem('meetings')
+  const handleSaveProject = project => {
+    upsertProject(project)
+    window.dispatchEvent(new CustomEvent('projects-change', { detail: project }))
   }
 
   const renderContent = () => {
@@ -155,11 +143,6 @@ function App() {
       projectsActive: 3,
       totalProjects: 5,
       timeTracked: '4h 30m'
-    }
-
-    // Handle meeting view
-    if (currentView === 'meeting-view') {
-      return <MeetingView meeting={selectedMeeting} onClose={exitMeetingView} />
     }
 
     // Regular page content
@@ -177,6 +160,10 @@ function App() {
             }}
             onActivityStopped={syncActivityStopped}
             runningActivity={runningActivity}
+            onOpenPage={page => { setPageToOpen(page); setActiveItem('notes') }}
+            onOpenPages={() => setActiveItem('notes')}
+            onOpenTasks={() => setActiveItem('tasks')}
+            onOpenMeetings={meeting => { setMeetingToOpen(meeting?.entry_id ? meeting : null); setActiveItem('meetings') }}
           />
         )
       case 'tasks':
@@ -201,18 +188,16 @@ function App() {
             }}
             onActivityStopped={syncActivityStopped}
             runningActivity={runningActivity}
+            onOpenPage={page => { setPageToOpen(page); setActiveItem('notes') }}
+            onOpenPages={() => { setPageToOpen(null); setActiveItem('notes') }}
           />
         )
       case 'meetings':
-        return <MeetingsPage openMeetingView={navigateToMeeting} />
+        return <MeetingsPage meetingToOpen={meetingToOpen} onMeetingOpened={() => setMeetingToOpen(null)} onOpenPage={page => { setPageToOpen(page); setActiveItem('notes') }} runningActivity={runningActivity} onActivityStarted={(activity, task) => { syncActivityStarted(activity, task); setIsTimerOpen(false) }} onActivityStopped={syncActivityStopped} />
       case 'notes':
-        return <NotesPage />
+        return <NotesPage pageToOpen={pageToOpen} onPageOpened={() => setPageToOpen(null)} openTaskModal={openTaskModal} taskRefreshTrigger={taskRefreshTrigger} />
       case 'activities':
-        return <ActivitiesPage />
-      case 'habits':
-        return <HabitsPage />
-      case 'analytics':
-        return <AnalyticsPage />
+        return <ActivitiesPage runningActivity={runningActivity} onActivityStarted={syncActivityStarted} onActivityStopped={syncActivityStopped} />
       case 'apps':
         return <AppsPage />
       default:
@@ -221,17 +206,12 @@ function App() {
   }
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-gray-100 dark:bg-gray-800">
+    <div className="flex h-screen flex-col overflow-hidden bg-slate-50 dark:bg-gray-800">
       {/* Unified Header - Fixed */}
       <UnifiedHeader
-        activeItem={activeItem}
-        onNewAction={handleNewAction}
+        pageTitle={pageTitle}
         searchQuery={searchQuery}
         setSearchQuery={setSearchQuery}
-        isNewDropdownOpen={isNewDropdownOpen}
-        setIsNewDropdownOpen={setIsNewDropdownOpen}
-        dropdownTimeout={dropdownTimeout}
-        setDropdownTimeout={setDropdownTimeout}
         isTimerOpen={isTimerOpen}
         setIsTimerOpen={setIsTimerOpen}
         elapsedTime={elapsedTime}
@@ -246,7 +226,31 @@ function App() {
         resetTimer={resetTimer}
         formatTime={formatTime}
         getCurrentDateTime={getCurrentDateTime}
-        onSettingsClick={openSettings}
+        searchTasks={tasks}
+        searchPages={searchPages}
+        searchMeetings={searchMeetings}
+        projects={projects}
+        onOpenSearchTask={task => {
+          setActiveItem('tasks')
+          openTaskModal(task, 'edit')
+        }}
+        onOpenSearchPage={page => {
+          setPageToOpen(page)
+          setActiveItem('notes')
+        }}
+        onOpenSearchProject={project => {
+          setActiveItem('projects')
+          openProjectModal(project, 'edit')
+        }}
+        onOpenSearchMeeting={meeting => {
+          setMeetingToOpen({
+            ...meeting,
+            entry_id: meeting.outlook_id || undefined,
+            subject: meeting.title,
+            start: `${meeting.date}T${meeting.start_time || '00:00:00'}`
+          })
+          setActiveItem('meetings')
+        }}
       />
       
       <div className="flex flex-1 overflow-hidden">
@@ -258,10 +262,11 @@ function App() {
           onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
           onAddTask={openTaskModal}
           onAddProject={openProjectModal}
+          onSettingsClick={openSettings}
         />
 
         {/* Main Content - Scrollable */}
-        <main className="flex-1 overflow-auto">
+        <main className="min-h-0 min-w-0 flex-1 overflow-hidden">
           {renderContent()}
         </main>
       </div>
@@ -281,6 +286,7 @@ function App() {
         isOpen={isTaskModalOpen}
         onClose={handleCloseTaskModal}
         task={selectedTaskForEdit}
+        initialOpenPages={Boolean(taskModalOptions.openPages)}
         onSave={handleSaveTask}
         onUpdateTask={updateTask}
         onCreateTask={createTask}
@@ -321,13 +327,6 @@ function App() {
         }}
       />
 
-      {/* ⚡ Quick Add Task - Available everywhere */}
-      <QuickAddTask
-        onCreateTask={createTask}
-        isExpanded={isQuickAddExpanded}
-        setIsExpanded={setIsQuickAddExpanded}
-        onTaskCreated={() => setTaskRefreshTrigger(prev => prev + 1)}
-      />
     </div>
   )
 }

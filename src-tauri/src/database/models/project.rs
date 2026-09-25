@@ -23,6 +23,7 @@ pub struct CreateProjectRequest {
     pub deadline: String,
     pub priority: String,
     pub progress: i64,
+    pub status: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

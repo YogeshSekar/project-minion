@@ -1,23 +1,31 @@
 // Models module
 // This module contains all data models
 
-pub mod project;
-pub mod task;
+pub mod activity;
+pub mod area;
 pub mod meeting;
 pub mod note;
-pub mod activity;
-pub mod habit;
-pub mod habit_log;
-pub mod task_completion_log;
+pub mod page;
+pub mod page_pin;
+pub mod page_update;
+pub mod project;
+pub mod task;
 pub mod task_checklist;
+pub mod task_completion_log;
 
 // Re-export all models for easier access
-pub use project::{Project, CreateProjectRequest, UpdateProjectRequest};
-pub use task::{Task, CreateTaskRequest, UpdateTaskRequest};
-pub use meeting::{Meeting, CreateMeetingRequest, UpdateMeetingRequest, UpdateMeetingUrlRequest};
-pub use note::{Note, CreateNoteRequest, UpdateNoteRequest};
-pub use activity::{Activity, CreateActivityRequest, UpdateActivityRequest};
-pub use habit::{Habit, CreateHabitRequest, UpdateHabitRequest};
-pub use habit_log::{HabitLog, CreateHabitLogRequest, UpdateHabitLogRequest};
-pub use task_completion_log::{TaskCompletionLog, CreateTaskCompletionLogRequest, UpdateTaskCompletionLogRequest};
-pub use task_checklist::{TaskChecklistItem, CreateTaskChecklistItemRequest, UpdateTaskChecklistItemRequest};
+pub use activity::{Activity, ActivityAnalytics, CreateActivityRequest, UpdateActivityRequest};
+pub use area::{Area, CreateAreaRequest, UpdateAreaRequest};
+pub use meeting::{CreateMeetingRequest, Meeting, UpdateMeetingRequest, UpdateMeetingUrlRequest};
+pub use note::{CreateNoteRequest, Note, UpdateNoteRequest};
+pub use page::{CreatePageRequest, Page, UpdatePageRequest};
+pub use page_pin::{CreatePagePinRequest, PagePin};
+pub use page_update::{CreatePageUpdateRequest, PageUpdate, UpdatePageUpdateRequest};
+pub use project::{CreateProjectRequest, Project, UpdateProjectRequest};
+pub use task::{CreateTaskRequest, Task, UpdateTaskRequest};
+pub use task_checklist::{
+    CreateTaskChecklistItemRequest, TaskChecklistItem, UpdateTaskChecklistItemRequest,
+};
+pub use task_completion_log::{
+    CreateTaskCompletionLogRequest, TaskCompletionLog, UpdateTaskCompletionLogRequest,
+};

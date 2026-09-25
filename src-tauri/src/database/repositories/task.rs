@@ -1,10 +1,7 @@
+use crate::database::models::task::{CreateTaskRequest, Task, UpdateTaskRequest};
 use sqlx::{Pool, Sqlite};
-use crate::database::models::task::{Task, CreateTaskRequest, UpdateTaskRequest};
 
-pub async fn create_task(
-    pool: &Pool<Sqlite>,
-    req: CreateTaskRequest,
-) -> Result<Task, sqlx::Error> {
+pub async fn create_task(pool: &Pool<Sqlite>, req: CreateTaskRequest) -> Result<Task, sqlx::Error> {
     let task = sqlx::query_as::<_, Task>(
         r#"
         INSERT INTO tasks (title, description, status, priority, due_date, scheduled_date, project_id, is_recurring, recurrence_type, recurrence_interval, meeting_id)
@@ -33,10 +30,7 @@ pub async fn create_task(
     Ok(task)
 }
 
-pub async fn update_task(
-    pool: &Pool<Sqlite>,
-    req: UpdateTaskRequest,
-) -> Result<Task, sqlx::Error> {
+pub async fn update_task(pool: &Pool<Sqlite>, req: UpdateTaskRequest) -> Result<Task, sqlx::Error> {
     let task = sqlx::query_as::<_, Task>(
         r#"
         UPDATE tasks 
@@ -77,7 +71,6 @@ pub async fn get_all_tasks(pool: &Pool<Sqlite>) -> Result<Vec<Task>, sqlx::Error
 
     Ok(tasks)
 }
-
 
 pub async fn delete_task(pool: &Pool<Sqlite>, id: i64) -> Result<(), sqlx::Error> {
     sqlx::query(

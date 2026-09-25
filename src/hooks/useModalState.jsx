@@ -8,6 +8,7 @@ function useModalState() {
   const [isTaskModalOpen, setIsTaskModalOpen] = useState(false)
   const [taskModalMode, setTaskModalMode] = useState('create') // 'create' or 'edit'
   const [selectedTaskForEdit, setSelectedTaskForEdit] = useState(null)
+  const [taskModalOptions, setTaskModalOptions] = useState({})
 
   // Note modal
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false)
@@ -22,9 +23,10 @@ function useModalState() {
   const closeSettings = () => setIsSettingsOpen(false)
 
   // Task modal functions
-  const openTaskModal = (task = null, mode = 'create') => {
+  const openTaskModal = (task = null, mode = 'create', options = {}) => {
     setSelectedTaskForEdit(task)
     setTaskModalMode(mode)
+    setTaskModalOptions(options)
     setIsTaskModalOpen(true)
   }
 
@@ -32,6 +34,7 @@ function useModalState() {
     setIsTaskModalOpen(false)
     setSelectedTaskForEdit(null)
     setTaskModalMode('create')
+    setTaskModalOptions({})
   }
 
   // Note modal functions
@@ -61,6 +64,7 @@ function useModalState() {
     isTaskModalOpen,
     taskModalMode,
     selectedTaskForEdit,
+    taskModalOptions,
     openTaskModal,
     closeTaskModal,
 

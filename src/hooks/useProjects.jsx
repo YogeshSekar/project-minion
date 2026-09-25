@@ -53,8 +53,30 @@ function useProjects() {
     return response
   }
 
+  const upsertProject = project => {
+    if (!project?.id) return
+    setProjects(current => {
+      const exists = current.some(item => String(item.id) === String(project.id))
+      return exists
+        ? current.map(item => String(item.id) === String(project.id) ? project : item)
+        : [project, ...current]
+    })
+  }
+
   useEffect(() => {
     loadProjects()
+  }, [])
+
+  useEffect(() => {
+    const syncProject = event => {
+      const project = event.detail
+      if (!project?.id) return
+      setProjects(current => current.some(item => String(item.id) === String(project.id))
+        ? current.map(item => String(item.id) === String(project.id) ? project : item)
+        : [project, ...current])
+    }
+    window.addEventListener('projects-change', syncProject)
+    return () => window.removeEventListener('projects-change', syncProject)
   }, [])
 
   return {
@@ -62,6 +84,7 @@ function useProjects() {
     loading,
     error,
     loadProjects,
+    upsertProject,
     createProject: handleCreateProject,
     updateProject: handleUpdateProject,
     deleteProject: handleDeleteProject

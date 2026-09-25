@@ -12,19 +12,25 @@ export function getCurrentDateTime() {
 
 export function formatDate(dateStr) {
   if (!dateStr) return 'No date'
-  const date = new Date(dateStr)
+  const date = parseDateWithoutTimezoneShift(dateStr)
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 export function formatDateShort(dateStr) {
   if (!dateStr) return ''
-  const date = new Date(dateStr)
+  const date = parseDateWithoutTimezoneShift(dateStr)
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
 export function formatDateISO(date) {
   if (!date) return ''
-  return date.toISOString().split('T')[0]
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+function parseDateWithoutTimezoneShift(value) {
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})(?:$|T)/)
+  if (match && String(value).length === 10) return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
+  return new Date(value)
 }
 
 // Time formatting utilities
@@ -241,4 +247,74 @@ export function getWeekDays(selectedDate) {
 
 export function formatDateLabel(date) {
   return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+}
+
+// Stats calculation utilities
+export function calculateDailyStats(tasks, runningActivity) {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  
+  const todayTasks = tasks.filter(task => {
+    if (!task.scheduled_date) return false
+    const taskDate = new Date(task.scheduled_date)
+    taskDate.setHours(0, 0, 0, 0)
+    return taskDate.getTime() === today.getTime()
+  })
+  
+  const completedToday = todayTasks.filter(task => task.status === 'completed').length
+  const totalToday = todayTasks.length
+  const completionRate = totalToday > 0 ? Math.round((completedToday / totalToday) * 100) : 0
+  
+  // Calculate week stats
+  const weekStart = new Date(today)
+  const day = weekStart.getDay()
+  const diff = weekStart.getDate() - day + (day === 0 ? -6 : 1)
+  weekStart.setDate(diff)
+  weekStart.setHours(0, 0, 0, 0)
+  
+  const weekTasks = tasks.filter(task => {
+    if (!task.scheduled_date) return false
+    const taskDate = new Date(task.scheduled_date)
+    taskDate.setHours(0, 0, 0, 0)
+    return taskDate.getTime() >= weekStart.getTime()
+  })
+  
+  const completedThisWeek = weekTasks.filter(task => task.status === 'completed').length
+  
+  return {
+    completedToday,
+    totalToday,
+    completionRate,
+    completedThisWeek,
+    totalWeek: weekTasks.length
+  }
+}
+
+export function calculateProjectStats(projects, tasks) {
+  const activeProjects = projects.filter(p => p.status !== 'completed').length
+  const totalProjects = projects.length
+  
+  // Calculate overall project completion
+  const completedTasks = tasks.filter(task => task.status === 'completed').length
+  const totalTasks = tasks.length
+  const overallCompletion = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0
+  
+  return {
+    activeProjects,
+    totalProjects,
+    overallCompletion
+  }
+}
+
+export function calculateTimeStats(runningActivity) {
+  // For now, return basic stats - can be enhanced with actual time tracking data
+  const hasActiveSession = runningActivity !== null
+  const sessionDuration = hasActiveSession ? 
+    Math.floor((Date.now() - new Date(runningActivity.started_at).getTime()) / 1000 / 60) : 0
+  
+  return {
+    hasActiveSession,
+    sessionDuration,
+    totalFocusTime: sessionDuration // In minutes
+  }
 }

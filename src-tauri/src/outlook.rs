@@ -1,6 +1,6 @@
-use std::process::Command;
 use serde::{Deserialize, Serialize};
 use std::os::windows::process::CommandExt;
+use std::process::Command;
 
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
@@ -23,8 +23,8 @@ pub fn get_outlook_meetings(date: String) -> Result<Vec<OutlookMeeting>, String>
 
     if output.status.success() {
         let json = String::from_utf8_lossy(&output.stdout).to_string();
-        let meetings: Vec<OutlookMeeting> = serde_json::from_str(&json)
-            .map_err(|e| format!("Failed to parse JSON: {}", e))?;
+        let meetings: Vec<OutlookMeeting> =
+            serde_json::from_str(&json).map_err(|e| format!("Failed to parse JSON: {}", e))?;
         Ok(meetings)
     } else {
         Err(format!(

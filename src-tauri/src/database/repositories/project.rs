@@ -1,14 +1,14 @@
+use crate::database::models::project::{CreateProjectRequest, Project, UpdateProjectRequest};
 use sqlx::{Pool, Sqlite};
-use crate::database::models::project::{Project, CreateProjectRequest, UpdateProjectRequest};
 
 pub async fn create_project(
     pool: &Pool<Sqlite>,
     req: CreateProjectRequest,
 ) -> Result<Project, sqlx::Error> {
     let status = if req.progress >= 100 {
-        "completed"
+        "completed".to_string()
     } else {
-        "active"
+        req.status.unwrap_or_else(|| "planning".to_string())
     };
 
     let project = sqlx::query_as::<_, Project>(
@@ -24,7 +24,7 @@ pub async fn create_project(
     .bind(&req.deadline)
     .bind(&req.priority)
     .bind(req.progress)
-    .bind(status)
+    .bind(&status)
     .fetch_one(pool)
     .await?;
 
@@ -43,7 +43,10 @@ pub async fn get_all_projects(pool: &Pool<Sqlite>) -> Result<Vec<Project>, sqlx:
     Ok(projects)
 }
 
-pub async fn get_project_by_id(pool: &Pool<Sqlite>, id: i64) -> Result<Option<Project>, sqlx::Error> {
+pub async fn get_project_by_id(
+    pool: &Pool<Sqlite>,
+    id: i64,
+) -> Result<Option<Project>, sqlx::Error> {
     let project = sqlx::query_as::<_, Project>(
         r#"
         SELECT * FROM projects WHERE id = ?1

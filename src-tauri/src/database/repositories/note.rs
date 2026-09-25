@@ -1,10 +1,7 @@
+use crate::database::models::note::{CreateNoteRequest, Note, UpdateNoteRequest};
 use sqlx::{Pool, Sqlite};
-use crate::database::models::note::{Note, CreateNoteRequest, UpdateNoteRequest};
 
-pub async fn create_note(
-    pool: &Pool<Sqlite>,
-    req: CreateNoteRequest,
-) -> Result<Note, sqlx::Error> {
+pub async fn create_note(pool: &Pool<Sqlite>, req: CreateNoteRequest) -> Result<Note, sqlx::Error> {
     let note = sqlx::query_as::<_, Note>(
         r#"
         INSERT INTO notes (title, content, created_date, project_id, note_type, meeting_id)
@@ -36,7 +33,10 @@ pub async fn get_all_notes(pool: &Pool<Sqlite>) -> Result<Vec<Note>, sqlx::Error
     Ok(notes)
 }
 
-pub async fn get_notes_by_project(pool: &Pool<Sqlite>, project_id: i64) -> Result<Vec<Note>, sqlx::Error> {
+pub async fn get_notes_by_project(
+    pool: &Pool<Sqlite>,
+    project_id: i64,
+) -> Result<Vec<Note>, sqlx::Error> {
     let notes = sqlx::query_as::<_, Note>(
         r#"
         SELECT * FROM notes WHERE project_id = ?1 ORDER BY created_at DESC
@@ -62,10 +62,7 @@ pub async fn get_note_by_id(pool: &Pool<Sqlite>, id: i64) -> Result<Option<Note>
     Ok(note)
 }
 
-pub async fn update_note(
-    pool: &Pool<Sqlite>,
-    req: UpdateNoteRequest,
-) -> Result<Note, sqlx::Error> {
+pub async fn update_note(pool: &Pool<Sqlite>, req: UpdateNoteRequest) -> Result<Note, sqlx::Error> {
     let note = sqlx::query_as::<_, Note>(
         r#"
         UPDATE notes

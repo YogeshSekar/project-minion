@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
-import { List, LayoutGrid, Filter, ArrowUpDown, Plus, Play, CheckCircle, Calendar, Trash2, Square, Loader2, Eye, EyeOff } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { AlertCircle, ChevronDown, List, LayoutGrid, Filter, ArrowUpDown, Plus, Play, CheckCircle, Calendar, Trash2, Square, Loader2, Inbox, RefreshCw, Search, X, Layers3 } from 'lucide-react'
 import { BoardView } from '../components/BoardView'
 import ConfirmModal from '../components/ConfirmModal'
-import TaskCard from '../components/TaskCard'
-import GroupedCompletedTaskCard from '../components/GroupedCompletedTaskCard'
+import TaskListView from '../components/TaskListView'
+import DatePickerField from '../components/DatePickerField'
 import useTasks from '../hooks/useTasks'
 import useProjects from '../hooks/useProjects'
 import useClickOutside from '../hooks/useClickOutside'
@@ -12,26 +12,73 @@ import { getRunningActivity } from '../services/api'
 import { formatDate, getPriorityBgColor, isOverdue } from '../utils/helpers'
 import { groupCompletedTasks } from '../utils/taskGrouping'
 
+function TasksLoadingState({ viewMode, showDone }) {
+  if (viewMode === 'list') {
+    return (
+      <div className="h-full overflow-hidden bg-white" aria-label="Loading tasks" aria-busy="true">
+        <div className="grid grid-cols-[40px_2fr_1fr_1fr_1fr_1fr] gap-4 border-b border-slate-200 bg-slate-50 px-4 py-3">
+          {Array.from({ length: 6 }).map((_, index) => <div key={index} className="h-3 animate-pulse rounded-full bg-slate-200" />)}
+        </div>
+        <div className="divide-y divide-slate-100 px-4">
+          {Array.from({ length: 7 }).map((_, row) => (
+            <div key={row} className="grid grid-cols-[40px_2fr_1fr_1fr_1fr_1fr] items-center gap-4 py-4">
+              {Array.from({ length: 6 }).map((_, cell) => <div key={cell} className="h-4 animate-pulse rounded-full bg-slate-100" />)}
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex h-full min-h-[420px] gap-3 overflow-hidden bg-white p-4" aria-label="Loading tasks" aria-busy="true">
+      {Array.from({ length: showDone ? 4 : 3 }).map((_, column) => (
+        <div key={column} className="min-w-[260px] flex-1 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+          <div className="mb-4 flex items-center gap-2 border-b border-slate-200 pb-3">
+            <div className="h-2.5 w-6 animate-pulse rounded-full bg-slate-300" />
+            <div className="h-4 w-24 animate-pulse rounded-full bg-slate-200" />
+          </div>
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, card) => (
+              <div key={card} className="rounded-xl border border-slate-200 bg-white p-3">
+                <div className="mb-4 h-4 animate-pulse rounded-full bg-slate-200" />
+                <div className="flex gap-2">
+                  <div className="h-5 w-14 animate-pulse rounded-full bg-slate-100" />
+                  <div className="h-5 w-20 animate-pulse rounded-full bg-slate-100" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, onActivityStopped, runningActivity: propRunningActivity }) {
-  const [viewMode, setViewMode] = useState('board')
-  const [showCompleted, setShowCompleted] = useState(false)
-  const [showDone, setShowDone] = useState(false)
-  const [showTodo, setShowTodo] = useState(true)
-  const [showInProgress, setShowInProgress] = useState(true)
-  const [showWaiting, setShowWaiting] = useState(true)
+  const [viewMode, setViewMode] = useState(() => localStorage.getItem('tasks.viewMode') || 'board')
+  const [showDone, setShowDone] = useState(() => localStorage.getItem('tasks.showDone') === 'true')
   const [filterOption, setFilterOption] = useState('all')
-  const [priorityFilter, setPriorityFilter] = useState('all')
-  const [sortOption, setSortOption] = useState('created_date')
+  const [priorityFilters, setPriorityFilters] = useState([])
+  const [customDateStart, setCustomDateStart] = useState('')
+  const [customDateEnd, setCustomDateEnd] = useState('')
+  const [sortOption, setSortOption] = useState(() => localStorage.getItem('tasks.sort.option') || 'created_date')
+  const [sortDirection, setSortDirection] = useState(() => localStorage.getItem('tasks.sort.direction') || 'desc')
+  const [listGroupBy, setListGroupBy] = useState(() => localStorage.getItem('tasks.list.groupBy') || 'date')
   const [selectedProjects, setSelectedProjects] = useState([])
+  const [projectSearch, setProjectSearch] = useState('')
+  const [focusTaskId, setFocusTaskId] = useState(null)
 
   // Use hooks for data management
-  const { tasks, loading: tasksLoading, updateTask, deleteTask, loadTasks } = useTasks()
-  const { projects, loading: projectsLoading } = useProjects()
+  const { tasks, loading: tasksLoading, error: tasksError, createTask, updateTask, deleteTask, loadTasks } = useTasks()
+  const { projects, loading: projectsLoading, error: projectsError, loadProjects } = useProjects()
 
 
   // Use click-outside hooks for dropdowns
-  const filterDropdown = useClickOutside()
+  const dateDropdown = useClickOutside()
+  const priorityDropdown = useClickOutside()
   const sortDropdown = useClickOutside()
+  const groupDropdown = useClickOutside()
 
   // Confirm modal state
   const [confirmModalOpen, setConfirmModalOpen] = useState(false)
@@ -52,6 +99,29 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
     if (propRunningActivity === undefined) {
       loadRunningActivity()
     }
+  }, [])
+
+  useEffect(() => {
+    localStorage.setItem('tasks.sort.option', sortOption)
+    localStorage.setItem('tasks.sort.direction', sortDirection)
+  }, [sortOption, sortDirection])
+
+  useEffect(() => {
+    localStorage.setItem('tasks.list.groupBy', listGroupBy)
+  }, [listGroupBy])
+
+  useEffect(() => {
+    localStorage.setItem('tasks.viewMode', viewMode)
+    localStorage.setItem('tasks.showDone', String(showDone))
+  }, [viewMode, showDone])
+
+  useEffect(() => {
+    const applyPreferences = event => {
+      if (event.detail?.viewMode) setViewMode(event.detail.viewMode)
+      if (typeof event.detail?.showDone === 'boolean') setShowDone(event.detail.showDone)
+    }
+    window.addEventListener('tasks-preferences-change', applyPreferences)
+    return () => window.removeEventListener('tasks-preferences-change', applyPreferences)
   }, [])
 
   const loadRunningActivity = async () => {
@@ -120,6 +190,9 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
       loadTasks()
     }
   }, [taskRefreshTrigger, loadTasks])
+
+  // Add a key to force TaskListView re-render when sort changes
+  const listViewKey = `${sortOption}-${sortDirection}-${listGroupBy}-${filterOption}-${customDateStart}-${customDateEnd}-${priorityFilters.join('-')}-${selectedProjects.join('-')}`
 
   const handleUpdateTask = async (updatedTask) => {
     const response = await updateTask(updatedTask)
@@ -196,8 +269,39 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
     }
   }
 
-  const handleEditTask = (task) => {
-    openTaskModal(task, 'edit')
+  const handleEditTask = (task, options = {}) => {
+    openTaskModal(task, 'edit', options)
+  }
+  const handleLinkPage = task => handleEditTask(task, { openPages: true })
+
+  const handleQuickAddTask = async (status, title, overrides = {}) => {
+    const quickAddDate = new Date()
+    if (filterOption === 'tomorrow') quickAddDate.setDate(quickAddDate.getDate() + 1)
+    if (filterOption === 'overdue') quickAddDate.setDate(quickAddDate.getDate() - 1)
+    const scheduledDate = filterOption === 'all' || filterOption === 'no_date'
+      ? null
+      : filterOption === 'custom'
+      ? customDateStart || null
+      : quickAddDate.toISOString().split('T')[0]
+    const response = await createTask({
+      title,
+      description: null,
+      status,
+      priority: overrides.priority || priorityFilters[0] || 'medium',
+      due_date: null,
+      scheduled_date: overrides.scheduled_date !== undefined ? overrides.scheduled_date : scheduledDate,
+      project_id: overrides.project_id !== undefined ? overrides.project_id : selectedProjects[0] || null,
+      is_recurring: 0,
+      recurrence_type: null,
+      recurrence_interval: 1,
+      meeting_id: null
+    })
+
+    if (response.success && response.data && overrides.focusAfterCreate !== false) {
+      setFocusTaskId(response.data.id)
+    }
+
+    return response
   }
 
   const handleToggleComplete = async (task) => {
@@ -224,6 +328,22 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
 
   // Combined loading state from hooks
   const loading = tasksLoading || projectsLoading
+  const loadError = tasksError || projectsError
+  const initialLoading = loading && tasks.length === 0
+  const hasActiveFilters = filterOption !== 'all' || priorityFilters.length > 0 || selectedProjects.length > 0
+
+  const clearAllFilters = () => {
+    setFilterOption('all')
+    setPriorityFilters([])
+    setCustomDateStart('')
+    setCustomDateEnd('')
+    setSelectedProjects([])
+  }
+
+  const retryLoading = () => {
+    loadTasks()
+    loadProjects()
+  }
 
   // Filter and sort tasks
   const getFilteredAndSortedTasks = (taskList) => {
@@ -239,6 +359,15 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
         scheduledDate.setHours(0, 0, 0, 0)
         return scheduledDate.getTime() === today.getTime()
       })
+    } else if (filterOption === 'tomorrow') {
+      const tomorrow = new Date(today)
+      tomorrow.setDate(tomorrow.getDate() + 1)
+      filtered = filtered.filter(t => {
+        if (!t.scheduled_date) return false
+        const scheduledDate = new Date(t.scheduled_date)
+        scheduledDate.setHours(0, 0, 0, 0)
+        return scheduledDate.getTime() === tomorrow.getTime()
+      })
     } else if (filterOption === 'this_week') {
       const startOfWeek = new Date(today)
       startOfWeek.setDate(today.getDate() - today.getDay())
@@ -253,6 +382,25 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
         const scheduledDate = new Date(t.scheduled_date)
         return scheduledDate >= startOfWeek && scheduledDate <= endOfWeek
       })
+    } else if (filterOption === 'overdue') {
+      filtered = filtered.filter(t => {
+        if (!t.scheduled_date || t.status === 'completed') return false
+        const scheduledDate = new Date(t.scheduled_date)
+        scheduledDate.setHours(0, 0, 0, 0)
+        return scheduledDate < today
+      })
+    } else if (filterOption === 'no_date') {
+      filtered = filtered.filter(t => !t.scheduled_date)
+    } else if (filterOption === 'custom') {
+      const start = customDateStart ? new Date(customDateStart) : null
+      const end = customDateEnd ? new Date(customDateEnd) : null
+      if (start) start.setHours(0, 0, 0, 0)
+      if (end) end.setHours(23, 59, 59, 999)
+      filtered = filtered.filter(t => {
+        if (!t.scheduled_date) return false
+        const scheduledDate = new Date(t.scheduled_date)
+        return (!start || scheduledDate >= start) && (!end || scheduledDate <= end)
+      })
     }
 
     // Project filter
@@ -261,11 +409,11 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
     }
 
     // Priority filter
-    if (priorityFilter !== 'all') {
-      filtered = filtered.filter(t => String(t.priority).toLowerCase() === priorityFilter)
+    if (priorityFilters.length > 0) {
+      filtered = filtered.filter(t => priorityFilters.includes(String(t.priority).toLowerCase()))
     }
 
-    // Sort with sensible tie-breakers
+    // Sort with sensible tie-breakers. Missing dates always remain at the end.
     const priorityOrder = { high: 0, medium: 1, low: 2 }
     return [...filtered].sort((a, b) => {
       const aDate = a.scheduled_date ? new Date(a.scheduled_date).getTime() : null
@@ -274,6 +422,7 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
       const bCreated = b.created_at ? new Date(b.created_at).getTime() : 0
 
       const cmpPriority = (x, y) => (priorityOrder[x] ?? 1) - (priorityOrder[y] ?? 1)
+      const direction = sortDirection === 'asc' ? 1 : -1
 
       switch (sortOption) {
         case 'due_date':
@@ -285,16 +434,18 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
           }
           if (aDate === null) return 1
           if (bDate === null) return -1
-          if (aDate !== bDate) return aDate - bDate
+          if (aDate !== bDate) return (aDate - bDate) * direction
           // same date -> priority -> created
           {
-            const p = cmpPriority(a.priority, b.priority)
+            const p = cmpPriority(a.priority, b.priority) * direction
             if (p !== 0) return p
             return bCreated - aCreated
           }
         case 'priority':
           {
-            const p = cmpPriority(a.priority, b.priority)
+            // Priority uses a semantic order: descending is High → Medium → Low,
+            // while ascending is Low → Medium → High.
+            const p = cmpPriority(a.priority, b.priority) * (sortDirection === 'desc' ? 1 : -1)
             if (p !== 0) return p
             // fallback to earliest scheduled date, then recent created
             if (aDate !== bDate) {
@@ -305,7 +456,7 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
             return bCreated - aCreated
           }
         case 'created_date':
-          if (bCreated !== aCreated) return bCreated - aCreated
+          if (bCreated !== aCreated) return (aCreated - bCreated) * direction
           // fallback to date then priority
           if (aDate !== bDate) {
             if (aDate === null) return 1
@@ -315,7 +466,7 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
           return cmpPriority(a.priority, b.priority)
         case 'name':
           {
-            const nameCmp = (a.title || '').localeCompare(b.title || '')
+            const nameCmp = (a.title || '').localeCompare(b.title || '') * direction
             if (nameCmp !== 0) return nameCmp
             return bCreated - aCreated
           }
@@ -332,55 +483,75 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
   const completedTasks = allTasks.filter(t => t.status === 'completed')
   
   // Group completed tasks for recurring tasks
-  const { oneTimeTasks, groupedRecurring } = groupCompletedTasks(completedTasks)
+  const { oneTimeTasks } = groupCompletedTasks(completedTasks)
   
   const visibleTasks = [
-    ...(showTodo ? pendingTasks : []),
-    ...(showInProgress ? inProgressTasks : []),
-    ...(showWaiting ? waitingTasks : []),
+    ...pendingTasks,
+    ...inProgressTasks,
+    ...waitingTasks,
     ...(showDone ? oneTimeTasks : [])
   ]
 
   // Add state for projects dropdown
   const projectsDropdown = useClickOutside()
-  const projectsHoverTimeoutRef = useRef(null)
-
-  const clearProjectsHoverTimeout = () => {
-    if (projectsHoverTimeoutRef.current) {
-      clearTimeout(projectsHoverTimeoutRef.current)
-      projectsHoverTimeoutRef.current = null
-    }
+  const orderedProjects = [...projects]
+    .filter(project => project.title.toLowerCase().includes(projectSearch.trim().toLowerCase()))
+    .sort((a, b) => {
+      const selectedDifference = Number(selectedProjects.includes(b.id)) - Number(selectedProjects.includes(a.id))
+      return selectedDifference || a.title.localeCompare(b.title)
+    })
+  const dateFilterLabels = {
+    all: 'Any',
+    today: 'Today',
+    tomorrow: 'Tomorrow',
+    this_week: 'This week',
+    overdue: 'Overdue',
+    no_date: 'No date',
+    custom: 'Custom'
   }
-
-  const handleProjectsDropdownMouseEnter = () => {
-    clearProjectsHoverTimeout()
-    projectsDropdown.setIsOpen(true)
+  const priorityFilterLabel = priorityFilters.length === 0
+    ? 'Any'
+    : priorityFilters.length === 1
+    ? `${priorityFilters[0].charAt(0).toUpperCase()}${priorityFilters[0].slice(1)}`
+    : `${priorityFilters.length} selected`
+  const sortLabel = sortOption === 'created_date'
+    ? (sortDirection === 'desc' ? 'Recently created' : 'Oldest created')
+    : sortOption === 'due_date'
+    ? 'Due date'
+    : sortOption === 'priority'
+    ? 'Priority'
+    : (sortDirection === 'asc' ? 'Name A–Z' : 'Name Z–A')
+  const listGroupLabels = { none: 'None', date: 'Date', priority: 'Priority', status: 'Status', project: 'Project' }
+  const chooseSort = (option, direction) => {
+    setSortOption(option)
+    setSortDirection(direction)
+    sortDropdown.setIsOpen(false)
   }
-
-  const handleProjectsDropdownMouseLeave = () => {
-    clearProjectsHoverTimeout()
-    projectsHoverTimeoutRef.current = setTimeout(() => {
-      projectsDropdown.setIsOpen(false)
-    }, 180)
-  }
-
-  useEffect(() => {
-    return () => clearProjectsHoverTimeout()
-  }, [])
 
   return (
-    <div className="h-full bg-gray-60 flex flex-col p-4">
+    <div className="flex h-full min-h-0 min-w-0 flex-col bg-white">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-white">
       {/* Top Controls Section - Fixed */}
-      <div className="relative z-30 mb-4 flex-shrink-0 overflow-visible rounded-2xl border border-gray-200/80 bg-white/95 p-3 shadow-sm backdrop-blur">
-        <div className="flex flex-wrap items-center justify-start gap-3">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex items-center gap-1 rounded-full border border-gray-200 bg-gray-50 p-1">
+      <div className="relative z-30 flex-shrink-0 overflow-visible border-b border-slate-200 bg-white p-3">
+        <div className="flex flex-wrap items-center justify-start gap-2">
+          <div className="contents">
+            <div
+              className="relative order-last ml-auto flex h-10 shrink-0 items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-0.5"
+              role="group"
+              aria-label="Task view"
+            >
+              <span
+                className={`pointer-events-none absolute inset-y-0.5 left-0.5 w-24 rounded-full border border-indigo-200 bg-indigo-100 transition-transform duration-300 ease-out ${viewMode === 'list' ? 'translate-x-[100px]' : 'translate-x-0'}`}
+                aria-hidden="true"
+              />
               <button
+                type="button"
                 onClick={() => setViewMode('board')}
-                className={`flex h-9 items-center justify-center gap-2 rounded-full px-3 text-sm font-medium transition-all ${
+                aria-pressed={viewMode === 'board'}
+                className={`relative z-10 flex h-9 w-24 items-center justify-center gap-2 rounded-full px-3 text-sm font-semibold transition-colors duration-300 ${
                   viewMode === 'board'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:bg-white hover:text-gray-900'
+                    ? 'text-indigo-700'
+                    : 'text-slate-700 hover:text-slate-900'
                 }`}
                 title="Board View"
               >
@@ -388,11 +559,13 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
                 <span>Board</span>
               </button>
               <button
+                type="button"
                 onClick={() => setViewMode('list')}
-                className={`flex h-9 items-center justify-center gap-2 rounded-full px-3 text-sm font-medium transition-all ${
+                aria-pressed={viewMode === 'list'}
+                className={`relative z-10 flex h-9 w-24 items-center justify-center gap-2 rounded-full px-3 text-sm font-semibold transition-colors duration-300 ${
                   viewMode === 'list'
-                    ? 'bg-white text-gray-900 shadow-sm'
-                    : 'text-gray-600 hover:bg-white hover:text-gray-900'
+                    ? 'text-indigo-700'
+                    : 'text-slate-700 hover:text-slate-900'
                 }`}
                 title="List View"
               >
@@ -404,48 +577,63 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
             <div
               ref={projectsDropdown.ref}
               className="relative z-40"
-              onMouseEnter={handleProjectsDropdownMouseEnter}
-              onMouseLeave={handleProjectsDropdownMouseLeave}
             >
               <button
                 type="button"
-                className="inline-flex h-9 min-w-[180px] items-center justify-center gap-2 rounded-full border border-gray-200 bg-white px-3 text-sm font-medium text-gray-700 transition-colors hover:border-gray-300 hover:bg-gray-50"
+                onClick={() => {
+                  const nextOpen = !projectsDropdown.isOpen
+                  projectsDropdown.setIsOpen(nextOpen)
+                  if (nextOpen) setProjectSearch('')
+                }}
+                className={`inline-flex h-9 min-w-[180px] max-w-[240px] items-center justify-between gap-2 rounded-full border px-3 text-sm font-medium transition-colors ${projectsDropdown.isOpen || selectedProjects.length > 0 ? 'border-indigo-300 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:bg-indigo-50/50'}`}
+                aria-expanded={projectsDropdown.isOpen}
+                aria-haspopup="listbox"
               >
                 <span className="truncate text-left">
                   {selectedProjects.length === 0
                     ? 'All projects'
                     : selectedProjects.length === 1
                     ? projects.find(p => p.id === selectedProjects[0])?.title || 'Project'
-                    : `Multiple (${selectedProjects.length})`}
+                    : `${selectedProjects.length} projects`}
                 </span>
+                <ChevronDown className={`h-4 w-4 flex-none transition-transform duration-200 ${projectsDropdown.isOpen ? 'rotate-180' : ''}`} />
               </button>
               {projectsDropdown.isOpen && (
                 <div
-                  className="absolute top-full left-0 mt-2 w-56 rounded-xl border border-gray-200 bg-white z-20 shadow-lg"
-                  onMouseEnter={handleProjectsDropdownMouseEnter}
-                  onMouseLeave={handleProjectsDropdownMouseLeave}
+                  className="absolute left-0 top-full z-20 mt-2 w-72 rounded-xl border border-slate-200 bg-white shadow-md"
                   onMouseDown={(e) => e.stopPropagation()}
                 >
                   <div className="p-3">
-                    <div className="mb-2 px-2 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">Select projects</div>
+                    <div className="mb-3 flex items-center justify-between gap-3 px-1">
+                      <span className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">Select projects</span>
+                      {selectedProjects.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedProjects([])}
+                          className="text-xs font-semibold text-indigo-700 hover:text-indigo-900"
+                        >
+                          Clear selection
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="relative mb-2">
+                      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="search"
+                        value={projectSearch}
+                        onChange={(event) => setProjectSearch(event.target.value)}
+                        placeholder="Search projects"
+                        className="h-9 w-full rounded-full border border-gray-200 bg-gray-50 pl-9 pr-3 text-sm text-gray-800 outline-none transition-colors placeholder:text-gray-400 focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+                        autoFocus
+                      />
+                    </div>
+
                     <div className="max-h-64 space-y-1 overflow-auto">
-                      <label className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
-                        selectedProjects.length === 0
-                          ? 'bg-todoist-red-light dark:bg-red-900/30 text-todoist-red dark:text-red-400'
-                          : 'text-gray-700 hover:bg-gray-50'
-                      }`}>
-                        <input
-                          type="checkbox"
-                          checked={selectedProjects.length === 0}
-                          onChange={() => setSelectedProjects([])}
-                          className="rounded border-gray-300 text-gray-900 focus:ring-gray-900 accent-gray-900"
-                        />
-                        <span>All projects</span>
-                      </label>
-                      {projects.map(project => (
+                      {orderedProjects.map(project => (
                         <label key={project.id} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
                           selectedProjects.includes(project.id)
-                            ? 'bg-todoist-red-light dark:bg-red-900/30 text-todoist-red dark:text-red-400'
+                            ? 'bg-indigo-50 text-indigo-800'
                             : 'text-gray-700 hover:bg-gray-50'
                         }`}>
                           <input
@@ -458,11 +646,14 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
                                 setSelectedProjects(selectedProjects.filter(id => id !== project.id))
                               }
                             }}
-                            className="rounded border-gray-300 text-gray-900 focus:ring-gray-900 accent-gray-900"
+                            className="rounded border-gray-300 accent-indigo-600 focus:ring-indigo-500"
                           />
                           <span className="truncate">{project.title}</span>
                         </label>
                       ))}
+                      {orderedProjects.length === 0 && (
+                        <div className="px-3 py-6 text-center text-sm text-gray-400">No projects found</div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -471,387 +662,342 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
           </div>
 
           <div className="flex items-center gap-2">
-            <div ref={filterDropdown.ref} className="relative z-40">
+            <div ref={dateDropdown.ref} className="relative z-40">
               <button
-                onClick={() => filterDropdown.setIsOpen(!filterDropdown.isOpen)}
-                className={`inline-flex h-9 min-w-[112px] items-center justify-center gap-2 rounded-full border px-3 text-sm font-medium transition-colors ${
-                  filterDropdown.isOpen || filterOption !== 'all'
-                    ? 'border-gray-900 bg-gray-900 text-white'
-                    : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                }`}
+                type="button"
+                onClick={() => dateDropdown.setIsOpen(!dateDropdown.isOpen)}
+                className={`inline-flex h-9 min-w-[128px] items-center justify-between gap-2 rounded-full border bg-white px-3 text-sm font-medium transition-colors ${dateDropdown.isOpen || filterOption !== 'all' ? 'border-indigo-300 bg-indigo-50 text-indigo-700' : 'border-gray-200 text-slate-700 hover:bg-gray-50 hover:text-slate-900'}`}
+                aria-expanded={dateDropdown.isOpen}
               >
-                <Filter className="h-4 w-4" />
-                <span>Filter</span>
-                {filterOption !== 'all' && (
-                  <span className="rounded-full bg-white/20 px-1.5 text-[11px]">
-                    {filterOption === 'today' ? 'Today' : 'Week'}
-                  </span>
-                )}
+                <Calendar className="h-4 w-4" />
+                <span className="whitespace-nowrap">Date: {dateFilterLabels[filterOption]}</span>
+                <ChevronDown className={`h-4 w-4 transition-transform ${dateDropdown.isOpen ? 'rotate-180' : ''}`} />
               </button>
-              {filterDropdown.isOpen && (
-                <div className="absolute top-full left-0 mt-2 w-48 rounded-xl border border-gray-200 bg-white z-10 shadow-lg">
-                  <div className="p-3">
-                    <div className="mb-2 px-2 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">Filter options</div>
-                    <div className="space-y-1">
-                      <label
-                        onClick={() => {
-                          setFilterOption('all')
-                          filterDropdown.setIsOpen(false)
-                        }}
-                        className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
-                          filterOption === 'all'
-                            ? 'bg-gray-100 text-gray-900'
-                            : 'text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="filter"
-                          checked={filterOption === 'all'}
-                          onChange={() => { setFilterOption('all'); filterDropdown.setIsOpen(false) }}
-                          className="rounded"
-                        />
-                        <span>All tasks</span>
+              {dateDropdown.isOpen && (
+                <div className="absolute left-0 top-full z-20 mt-2 w-64 rounded-xl border border-slate-200 bg-white p-2 shadow-md">
+                  {[
+                    ['all', 'Any date'], ['today', 'Today'], ['tomorrow', 'Tomorrow'],
+                    ['this_week', 'This week'], ['overdue', 'Overdue'], ['no_date', 'No date'], ['custom', 'Custom range']
+                  ].map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => {
+                        setFilterOption(value)
+                        if (value !== 'custom') dateDropdown.setIsOpen(false)
+                      }}
+                      className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm ${filterOption === value ? 'bg-indigo-50 font-semibold text-indigo-700' : 'text-gray-700 hover:bg-gray-50'}`}
+                    >
+                      {label}
+                      {filterOption === value && <CheckCircle className="h-4 w-4" />}
+                    </button>
+                  ))}
+                  {filterOption === 'custom' && (
+                    <div className="mt-2 space-y-2 border-t border-gray-100 p-2 pt-3">
+                      <label className="block text-xs font-medium text-gray-500">From
+                        <DatePickerField value={customDateStart} onChange={setCustomDateStart} placeholder="Start date" ariaLabel="Select custom range start date" className="mt-1 w-full" />
                       </label>
-                      <label
-                        onClick={() => { setFilterOption('today'); filterDropdown.setIsOpen(false) }}
-                        className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
-                          filterOption === 'today'
-                            ? 'bg-gray-100 text-gray-900'
-                            : 'text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="filter"
-                          checked={filterOption === 'today'}
-                          onChange={() => { setFilterOption('today'); filterDropdown.setIsOpen(false) }}
-                          className="rounded"
-                        />
-                        <span>Today</span>
+                      <label className="block text-xs font-medium text-gray-500">To
+                        <DatePickerField value={customDateEnd} onChange={setCustomDateEnd} placeholder="End date" ariaLabel="Select custom range end date" className="mt-1 w-full" />
                       </label>
-                      <label
-                        onClick={() => { setFilterOption('this_week'); filterDropdown.setIsOpen(false) }}
-                        className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
-                          filterOption === 'this_week'
-                            ? 'bg-gray-100 text-gray-900'
-                            : 'text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        <input
-                          type="radio"
-                          name="filter"
-                          checked={filterOption === 'this_week'}
-                          onChange={() => { setFilterOption('this_week'); filterDropdown.setIsOpen(false) }}
-                          className="rounded"
-                        />
-                        <span>This week</span>
-                      </label>
+                      <button type="button" onClick={() => dateDropdown.setIsOpen(false)} className="h-9 w-full rounded-full border border-slate-200 bg-white text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50">Done</button>
                     </div>
-                    <div className="mt-4 border-t border-slate-200/80 pt-3">
-                      <div className="mb-2 px-2 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">Priority</div>
-                      <div className="space-y-1">
-                        <label
-                          onClick={() => { setPriorityFilter('all'); filterDropdown.setIsOpen(false) }}
-                          className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
-                            priorityFilter === 'all'
-                              ? 'bg-gray-100 text-gray-900'
-                              : 'text-gray-700 hover:bg-gray-50'
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="priority"
-                            checked={priorityFilter === 'all'}
-                            onChange={() => { setPriorityFilter('all'); filterDropdown.setIsOpen(false) }}
-                            className="rounded"
-                          />
-                          <span>All priorities</span>
-                        </label>
-                        <label
-                          onClick={() => { setPriorityFilter('high'); filterDropdown.setIsOpen(false) }}
-                          className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
-                            priorityFilter === 'high'
-                              ? 'bg-gray-100 text-gray-900'
-                              : 'text-gray-700 hover:bg-gray-50'
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="priority"
-                            checked={priorityFilter === 'high'}
-                            onChange={() => { setPriorityFilter('high'); filterDropdown.setIsOpen(false) }}
-                            className="rounded"
-                          />
-                          <span>High</span>
-                        </label>
-                        <label
-                          onClick={() => { setPriorityFilter('medium'); filterDropdown.setIsOpen(false) }}
-                          className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
-                            priorityFilter === 'medium'
-                              ? 'bg-gray-100 text-gray-900'
-                              : 'text-gray-700 hover:bg-gray-50'
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="priority"
-                            checked={priorityFilter === 'medium'}
-                            onChange={() => { setPriorityFilter('medium'); filterDropdown.setIsOpen(false) }}
-                            className="rounded"
-                          />
-                          <span>Medium</span>
-                        </label>
-                        <label
-                          onClick={() => { setPriorityFilter('low'); filterDropdown.setIsOpen(false) }}
-                          className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
-                            priorityFilter === 'low'
-                              ? 'bg-gray-100 text-gray-900'
-                              : 'text-gray-700 hover:bg-gray-50'
-                          }`}
-                        >
-                          <input
-                            type="radio"
-                            name="priority"
-                            checked={priorityFilter === 'low'}
-                            onChange={() => { setPriorityFilter('low'); filterDropdown.setIsOpen(false) }}
-                            className="rounded"
-                          />
-                          <span>Low</span>
-                        </label>
-                      </div>
-                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div ref={priorityDropdown.ref} className="relative z-40">
+              <button
+                type="button"
+                onClick={() => priorityDropdown.setIsOpen(!priorityDropdown.isOpen)}
+                className={`inline-flex h-9 min-w-[140px] items-center justify-between gap-2 rounded-full border bg-white px-3 text-sm font-medium transition-colors ${priorityDropdown.isOpen || priorityFilters.length > 0 ? 'border-indigo-300 bg-indigo-50 text-indigo-700' : 'border-gray-200 text-slate-700 hover:bg-gray-50 hover:text-slate-900'}`}
+                aria-expanded={priorityDropdown.isOpen}
+              >
+                <span className="whitespace-nowrap">Priority: {priorityFilterLabel}</span>
+                <ChevronDown className={`h-4 w-4 transition-transform ${priorityDropdown.isOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {priorityDropdown.isOpen && (
+                <div className="absolute left-0 top-full z-20 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-3 shadow-md">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">Priorities</span>
+                    {priorityFilters.length > 0 && <button type="button" onClick={() => setPriorityFilters([])} className="text-xs font-semibold text-indigo-700 hover:text-indigo-900">Clear</button>}
                   </div>
+                  {[
+                    ['high', 'High', 'bg-red-500'], ['medium', 'Medium', 'bg-amber-500'], ['low', 'Low', 'bg-emerald-500']
+                  ].map(([value, label, dot]) => (
+                    <label key={value} className={`flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm ${priorityFilters.includes(value) ? 'bg-indigo-50 text-indigo-800' : 'text-gray-700 hover:bg-gray-50'}`}>
+                      <input
+                        type="checkbox"
+                        checked={priorityFilters.includes(value)}
+                        onChange={event => setPriorityFilters(event.target.checked ? [...priorityFilters, value] : priorityFilters.filter(item => item !== value))}
+                        className="rounded border-gray-300 accent-indigo-600"
+                      />
+                      <span className={`h-2.5 w-2.5 rounded-full ${dot}`} />
+                      <span>{label}</span>
+                    </label>
+                  ))}
                 </div>
               )}
             </div>
 
             <div ref={sortDropdown.ref} className="relative z-40">
               <button
+                type="button"
                 onClick={() => sortDropdown.setIsOpen(!sortDropdown.isOpen)}
-                className={`inline-flex h-9 min-w-[112px] items-center justify-center gap-2 rounded-full border px-3 text-sm font-medium transition-colors ${
-                  sortDropdown.isOpen || sortOption !== 'created_date'
-                    ? 'border-gray-900 bg-gray-900 text-white'
-                    : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                className={`inline-flex h-9 min-w-[176px] items-center justify-between gap-2 rounded-full border bg-white px-3 text-sm font-medium transition-colors ${
+                  sortDropdown.isOpen || sortOption !== 'created_date' || sortDirection !== 'desc'
+                    ? 'border-indigo-300 text-indigo-700'
+                    : 'border-gray-200 text-slate-700 hover:bg-gray-50 hover:text-slate-900'
                 }`}
+                aria-expanded={sortDropdown.isOpen}
               >
                 <ArrowUpDown className="h-4 w-4" />
-                <span>Sort</span>
-                {sortOption !== 'created_date' && (
-                  <span className="rounded-full bg-white/20 px-1.5 text-[11px]">
-                    {sortOption === 'due_date' ? 'Due' : sortOption === 'priority' ? 'Pri' : 'Name'}
-                  </span>
-                )}
+                <span className="whitespace-nowrap">Sort: {sortLabel}</span>
+                <span aria-hidden="true" className="text-xs">{sortDirection === 'asc' ? '↑' : '↓'}</span>
               </button>
               {sortDropdown.isOpen && (
-                <div className="absolute top-full left-0 mt-2 w-48 rounded-xl border border-gray-200 bg-white z-10 shadow-lg">
+                <div className="absolute left-0 top-full z-10 mt-2 w-64 rounded-xl border border-slate-200 bg-white shadow-md">
                   <div className="p-3">
-                    <div className="mb-2 px-2 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">Sort by</div>
-                    <div className="space-y-1">
+                    <div className="mb-2 flex items-center justify-between px-2 py-1">
+                      <span className="text-xs font-semibold uppercase tracking-[0.2em] text-gray-500">Sort by</span>
                       <button
-                        onClick={() => { setSortOption('due_date'); sortDropdown.setIsOpen(false) }}
-                        className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${
-                          sortOption === 'due_date'
-                            ? 'bg-gray-100 text-gray-900'
-                            : 'text-gray-700 hover:bg-gray-50'
-                        }`}
+                        type="button"
+                        onClick={() => setSortDirection(current => current === 'asc' ? 'desc' : 'asc')}
+                        className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 transition-colors hover:bg-indigo-100"
+                        title={`Switch to ${sortDirection === 'asc' ? 'descending' : 'ascending'} order`}
                       >
-                        Date
-                      </button>
-                      <button
-                        onClick={() => { setSortOption('created_date'); sortDropdown.setIsOpen(false) }}
-                        className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${
-                          sortOption === 'created_date'
-                            ? 'bg-gray-100 text-gray-900'
-                            : 'text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        Created date
-                      </button>
-                      <button
-                        onClick={() => { setSortOption('priority'); sortDropdown.setIsOpen(false) }}
-                        className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${
-                          sortOption === 'priority'
-                            ? 'bg-gray-100 text-gray-900'
-                            : 'text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        Priority
-                      </button>
-                      <button
-                        onClick={() => { setSortOption('name'); sortDropdown.setIsOpen(false) }}
-                        className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${
-                          sortOption === 'name'
-                            ? 'bg-gray-100 text-gray-900'
-                            : 'text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        Name
+                        {sortDirection === 'asc' ? 'Ascending ↑' : 'Descending ↓'}
                       </button>
                     </div>
+                    <div className="space-y-1">
+                      {[
+                        ['created_date', 'desc', 'Recently created'],
+                        ['created_date', 'asc', 'Oldest created'],
+                        ['due_date', 'asc', 'Due date'],
+                        ['priority', 'desc', 'Priority'],
+                        ['name', 'asc', 'Name A–Z'],
+                        ['name', 'desc', 'Name Z–A']
+                      ].map(([option, direction, label]) => {
+                        const selected = sortOption === option && sortDirection === direction
+                        return (
+                          <button
+                            key={`${option}-${direction}`}
+                            type="button"
+                            onClick={() => chooseSort(option, direction)}
+                            className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${selected ? 'bg-indigo-50 font-semibold text-indigo-700' : 'text-gray-700 hover:bg-gray-50'}`}
+                          >
+                            <span>{label}</span>
+                            {selected && <CheckCircle className="h-4 w-4" />}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <p className="mt-2 border-t border-gray-100 px-2 pt-2 text-xs leading-5 text-gray-500">
+                      Board dragging changes task status. Saved manual ordering is not available yet.
+                    </p>
                   </div>
                 </div>
               )}
             </div>
 
+            {viewMode === 'list' && (
+              <div ref={groupDropdown.ref} className="relative z-40">
+                <button
+                  type="button"
+                  onClick={() => groupDropdown.setIsOpen(!groupDropdown.isOpen)}
+                  className={`inline-flex h-9 min-w-[132px] items-center justify-between gap-2 rounded-full border bg-white px-3 text-sm font-medium transition-colors ${
+                    groupDropdown.isOpen || listGroupBy !== 'none'
+                      ? 'border-indigo-300 text-indigo-700'
+                      : 'border-gray-200 text-slate-700 hover:bg-gray-50 hover:text-slate-900'
+                  }`}
+                  aria-expanded={groupDropdown.isOpen}
+                >
+                  <Layers3 className="h-4 w-4" />
+                  <span className="whitespace-nowrap">Group: {listGroupLabels[listGroupBy]}</span>
+                  <ChevronDown className={`h-3.5 w-3.5 transition-transform ${groupDropdown.isOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {groupDropdown.isOpen && (
+                  <div className="absolute left-0 top-full z-10 mt-2 w-52 rounded-xl border border-slate-200 bg-white p-2 shadow-md">
+                    {[
+                      ['date', 'Date'],
+                      ['priority', 'Priority'],
+                      ['status', 'Status'],
+                      ['project', 'Project'],
+                      ['none', 'No grouping']
+                    ].map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => { setListGroupBy(value); groupDropdown.setIsOpen(false) }}
+                        className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${listGroupBy === value ? 'bg-indigo-50 font-semibold text-indigo-700' : 'text-gray-700 hover:bg-gray-50'}`}
+                      >
+                        <span>{label}</span>
+                        {listGroupBy === value && <CheckCircle className="h-4 w-4" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             <button
+              type="button"
               onClick={() => setShowDone(!showDone)}
-              className={`inline-flex h-9 items-center justify-center gap-2 rounded-full border px-3 text-sm font-medium transition-colors ${
+              className={`relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition-colors ${
                 showDone
-                  ? 'border-gray-900 bg-gray-900 text-white'
-                  : 'border-gray-200 bg-white text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                  : 'border-gray-200 bg-white text-slate-700 hover:bg-gray-50 hover:text-slate-900'
               }`}
-              title={showDone ? 'Hide Done' : 'Show Done'}
+              title={showDone ? 'Hide completed tasks' : 'Show completed tasks'}
+              aria-label={showDone ? 'Hide completed tasks' : 'Show completed tasks'}
+              aria-pressed={showDone}
             >
-              {showDone ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-              <span>Done</span>
+              <CheckCircle className="h-4 w-4" />
             </button>
           </div>
+
+          <button
+            type="button"
+            onClick={() => openTaskModal()}
+            className="order-first inline-flex h-9 items-center justify-center gap-2 rounded-full border border-indigo-600 bg-indigo-600 px-4 text-sm font-semibold text-white transition-colors duration-200 hover:border-indigo-700 hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
+          >
+            <Plus className="h-4 w-4" />
+            New task
+          </button>
         </div>
+
+        {selectedProjects.length > 1 && (
+          <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-gray-100 pt-3" aria-label="Selected project filters">
+            {selectedProjects.map(projectId => {
+              const project = projects.find(item => item.id === projectId)
+              if (!project) return null
+
+              return (
+                <button
+                  key={project.id}
+                  type="button"
+                  onClick={() => setSelectedProjects(selectedProjects.filter(id => id !== project.id))}
+                  className="inline-flex h-7 max-w-[220px] items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 text-xs font-semibold text-indigo-700 transition-colors hover:border-indigo-300 hover:bg-indigo-100"
+                  title={`Remove ${project.title} filter`}
+                >
+                  <span className="truncate">{project.title}</span>
+                  <X className="h-3.5 w-3.5 flex-none" />
+                </button>
+              )
+            })}
+            <button
+              type="button"
+              onClick={() => setSelectedProjects([])}
+              className="h-7 rounded-full px-2.5 text-xs font-semibold text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-800"
+            >
+              Clear all
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col relative min-h-0 overflow-hidden">
-        {viewMode === 'list' ? (
-          /* List Layout */
-          <div className="h-full flex flex-col min-h-0">
-            <div className="flex-1 min-h-0 rounded-2xl border border-gray-200 bg-white overflow-hidden">
-              <div className="flex-shrink-0 p-4 border-b border-gray-200 flex items-center justify-between">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button
-                    onClick={() => setShowTodo(!showTodo)}
-                    className={`flex items-center justify-center gap-2 px-3 py-2 rounded-full transition-colors text-sm font-medium ${
-                      showTodo
-                        ? 'bg-gray-900 text-white hover:bg-gray-700'
-                        : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
-                    }`}
-                  >
-                    <span>To Do</span>
-                    {pendingTasks.length > 0 && (
-                      <span className="text-xs px-1.5 py-0.5 rounded-full bg-white/20">
-                        {pendingTasks.length}
-                      </span>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => setShowInProgress(!showInProgress)}
-                    className={`flex items-center justify-center gap-2 px-3 py-2 rounded-full transition-colors text-sm font-medium ${
-                      showInProgress
-                        ? 'bg-gray-900 text-white hover:bg-gray-700'
-                        : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
-                    }`}
-                  >
-                    <span>In Progress</span>
-                    {inProgressTasks.length > 0 && (
-                      <span className="text-xs px-1.5 py-0.5 rounded-full bg-white/20">
-                        {inProgressTasks.length}
-                      </span>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => setShowWaiting(!showWaiting)}
-                    className={`flex items-center justify-center gap-2 px-3 py-2 rounded-full transition-colors text-sm font-medium ${
-                      showWaiting
-                        ? 'bg-gray-900 text-white hover:bg-gray-700'
-                        : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
-                    }`}
-                  >
-                    <span>Waiting</span>
-                    {waitingTasks.length > 0 && (
-                      <span className="text-xs px-1.5 py-0.5 rounded-full bg-white/20">
-                        {waitingTasks.length}
-                      </span>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => setShowDone(!showDone)}
-                    className={`flex items-center justify-center gap-2 px-3 py-2 rounded-full transition-colors text-sm font-medium ${
-                      showDone
-                        ? 'bg-gray-900 text-white hover:bg-gray-700'
-                        : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
-                    }`}
-                  >
-                    <span>Completed</span>
-                    {(oneTimeTasks.length + groupedRecurring.length) > 0 && (
-                      <span className="text-xs px-1.5 py-0.5 rounded-full bg-white/20">
-                        {oneTimeTasks.length + groupedRecurring.length}
-                      </span>
-                    )}
-                  </button>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                    <span className="text-xs text-gray-600">High</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
-                    <span className="text-xs text-gray-600">Medium</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                    <span className="text-xs text-gray-600">Low</span>
-                  </div>
-                </div>
+      <div className="flex-1 flex flex-col relative min-h-0 overflow-hidden bg-slate-100">
+        {initialLoading ? (
+          <TasksLoadingState viewMode={viewMode} showDone={showDone} />
+        ) : loadError ? (
+          <div className="flex h-full min-h-[360px] items-center justify-center bg-white px-6 text-center">
+            <div className="max-w-md">
+              <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-red-50 text-red-600">
+                <AlertCircle className="h-6 w-6" />
               </div>
-
-              <div className="flex-1 overflow-auto no-scrollbar p-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 auto-rows-max">
-                  {visibleTasks.map(task => {
-                    return (
-                      <TaskCard
-                        key={task.id}
-                        task={task}
-                        projects={projects}
-                        onToggleComplete={handleToggleComplete}
-                        onEdit={handleEditTask}
-                        onStartActivity={handleStartTaskActivity}
-                        onStopActivity={handleStopTaskActivity}
-                        runningActivity={runningActivity}
-                        onDelete={handleDeleteTask}
-                        onAddToToday={handleAddToToday}
-                      />
-                    )
-                  })}
-                </div>
-
-                {showCompleted && groupedRecurring.length > 0 && (
-                  <div className="mt-6 pt-6 border-t border-gray-200">
-                    <div className="text-xs font-semibold text-gray-900 uppercase tracking-wider mb-3 px-1 flex items-center gap-2">
-                      <span className="w-1.5 h-1.5 rounded-full bg-gray-900"></span>
-                      Recurring Completed
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 auto-rows-max">
-                      {groupedRecurring.map(group => (
-                        <GroupedCompletedTaskCard
-                          key={group.task_id}
-                          group={group}
-                          projects={projects}
-                          onEdit={handleEditTask}
-                          onDelete={handleDeleteTask}
-                          onToggleComplete={handleToggleComplete}
-                        />
-                      ))}
-                    </div>
-                  </div>
+              <h2 className="mt-4 text-lg font-semibold text-slate-900">Tasks could not be loaded</h2>
+              <p className="mt-1 text-sm leading-6 text-slate-500">{String(loadError)}</p>
+              <button
+                type="button"
+                onClick={retryLoading}
+                disabled={loading}
+                className="mx-auto mt-5 inline-flex h-9 items-center gap-2 rounded-full bg-slate-900 px-4 text-sm font-semibold text-white transition-colors hover:bg-slate-700 disabled:cursor-wait disabled:opacity-60"
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                {loading ? 'Retrying…' : 'Try again'}
+              </button>
+            </div>
+          </div>
+        ) : allTasks.length === 0 && (viewMode !== 'list' || !hasActiveFilters) ? (
+          <div className="flex h-full min-h-[360px] items-center justify-center bg-white px-6 text-center">
+            <div className="max-w-md">
+              <div className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-slate-100 text-slate-500">
+                {hasActiveFilters ? <Filter className="h-5 w-5" /> : <Inbox className="h-5 w-5" />}
+              </div>
+              <h2 className="mt-4 text-lg font-semibold text-slate-900">
+                {hasActiveFilters ? 'No tasks match these filters' : 'No tasks yet'}
+              </h2>
+              <p className="mt-1 text-sm leading-6 text-slate-500">
+                {hasActiveFilters
+                  ? 'Adjust or clear the active filters to bring tasks back into view.'
+                  : 'Create your first task and start organizing your work.'}
+              </p>
+              <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+                {hasActiveFilters && (
+                  <button
+                    type="button"
+                    onClick={clearAllFilters}
+                    className="inline-flex h-9 items-center rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                  >
+                    Clear filters
+                  </button>
                 )}
+                <button
+                  type="button"
+                  onClick={() => openTaskModal()}
+                  className="inline-flex h-9 items-center gap-2 rounded-full bg-indigo-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
+                >
+                  <Plus className="h-4 w-4" />
+                  New task
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : viewMode === 'list' ? (
+          /* List Layout */
+          <div className="h-full min-h-0 min-w-0 flex flex-col">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-transparent">
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+                <TaskListView
+                  key={listViewKey}
+                  tasks={visibleTasks}
+                  projects={projects}
+                  groupBy={listGroupBy}
+                  onUpdateTask={handleUpdateTask}
+                  onEdit={handleEditTask}
+                  onLinkPage={handleLinkPage}
+                  onDelete={handleDeleteTask}
+                  onAddToToday={handleAddToToday}
+                  onStartActivity={handleStartTaskActivity}
+                  onStopActivity={handleStopTaskActivity}
+                  runningActivity={runningActivity}
+                  hasActiveFilters={hasActiveFilters}
+                  onClearFilters={clearAllFilters}
+                  onQuickAddTask={handleQuickAddTask}
+                />
               </div>
             </div>
           </div>
         ) : (
           /* Board View */
-          <div className="h-full min-h-0 overflow-hidden rounded-2xl border border-gray-200 bg-white">
+          <div className="h-full min-h-0 overflow-hidden bg-transparent">
             <BoardView
               tasks={allTasks}
               projects={projects}
               onUpdateTask={handleUpdateTask}
               onDeleteTask={handleDeleteTask}
               onEditTask={handleEditTask}
+              onLinkPage={handleLinkPage}
               onAddToToday={handleAddToToday}
               onStartActivity={handleStartTaskActivity}
               onStopActivity={handleStopTaskActivity}
               runningActivity={runningActivity}
               showDone={showDone}
+              onQuickAddTask={handleQuickAddTask}
+              focusTaskId={focusTaskId}
+              onTaskFocusHandled={() => setFocusTaskId(null)}
             />
           </div>
         )}
@@ -868,6 +1014,7 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
           onConfirm={confirmModalConfig.onConfirm}
           onCancel={confirmModalConfig.onCancel}
         />
+      </div>
       </div>
     </div>
   )

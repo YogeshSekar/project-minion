@@ -1,20 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { createPortal } from 'react-dom'
-import { invoke } from '@tauri-apps/api/core'
-import { X, Clock, Star, MoreVertical, CheckSquare, Plus, Trash2, Calendar, CalendarDays, Timer, Target, Loader2, Check, User, FileText } from 'lucide-react'
+import { X, Trash2, Check, Link2 } from 'lucide-react'
 import Dropdown from './ui/Dropdown'
-import DateTimePicker from './DateTimePicker'
+import DatePickerField from './DatePickerField'
 import TipTapEditor from './TipTapEditor'
+import { getPages } from '../services/pageService'
+import { getPageIdsForTask, linkTaskToPage, unlinkTaskFromPage } from '../services/pageTaskService'
+import { formatDate } from '../utils/helpers'
 
 function TaskSidePanel({ 
   isOpen, 
   onClose, 
   task = null, 
+  initialOpenPages = false,
   onSave, 
   onUpdateTask,
   onCreateTask,
   mode = 'create',
   projects = [],
+  initialProjectId = null,
   onRefreshProjects = null,
   onDelete = null
 }) {
@@ -22,30 +25,26 @@ function TaskSidePanel({
   
   useEffect(() => {
     if (isOpen) {
-      setFormData({
+      const nextFormData = {
         title: task?.title || '',
         description: task?.description || '',
         priority: task?.priority || 'medium',
-        project_id: task?.project_id || null,
+        project_id: task?.project_id || (mode === 'create' ? initialProjectId : null),
         status: task?.status || 'todo',
         due_date: task?.due_date || '',
         scheduled_date: task?.scheduled_date || '',
-        is_recurring: task?.is_recurring === 1 || false,
+        is_recurring: task?.is_recurring === 1 || task?.is_recurring === true,
         recurrence_type: task?.recurrence_type || 'daily',
         recurrence_interval: task?.recurrence_interval || 1,
         estimated_minutes: task?.estimated_minutes || 0,
         actual_minutes: task?.actual_minutes || 0,
-      })
+      }
+      setFormData(nextFormData)
+      initialFormSnapshotRef.current = JSON.stringify(nextFormData)
       setErrors({})
       
-      // Load checklist items from backend if task exists
-      if (task?.id) {
-        loadChecklistItems(task.id)
-      } else {
-        setChecklist([])
-      }
     }
-  }, [panelKey, isOpen])
+  }, [panelKey, isOpen, initialProjectId, mode])
 
   const [formData, setFormData] = useState({
     title: '',
@@ -64,17 +63,65 @@ function TaskSidePanel({
 
   const [errors, setErrors] = useState({})
   const [isLoading, setIsLoading] = useState(false)
-  const [activeTab, setActiveTab] = useState('activity')
-  const [showDueDatePicker, setShowDueDatePicker] = useState(false)
-  const [showScheduledDatePicker, setShowScheduledDatePicker] = useState(false)
-  const [showRecurrenceEndDatePicker, setShowRecurrenceEndDatePicker] = useState(false)
-  const [datePickerPosition, setDatePickerPosition] = useState({ top: 0, left: 0 })
-  const [checklist, setChecklist] = useState(task?.checklist || [])
-  const [newChecklistItem, setNewChecklistItem] = useState('')
+  const [isDeleting, setIsDeleting] = useState(false)
+  const [recentProjectIds, setRecentProjectIds] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem('tasks.recentProjectIds') || '[]')
+    } catch {
+      return []
+    }
+  })
+  const [pages, setPages] = useState([])
+  const [linkedPageIds, setLinkedPageIds] = useState([])
+  const [pagesLoading, setPagesLoading] = useState(false)
+  const [showPagePicker, setShowPagePicker] = useState(false)
+  const [pageSearch, setPageSearch] = useState('')
+  const originalPageIdsRef = useRef([])
+  const createdTaskRef = useRef(null)
   const titleInputRef = useRef(null)
-  const dueDateButtonRef = useRef(null)
-  const scheduledDateButtonRef = useRef(null)
-  const checklistInputRef = useRef(null)
+  const initialFormSnapshotRef = useRef(JSON.stringify(formData))
+  const formDirty = JSON.stringify(formData) !== initialFormSnapshotRef.current
+  const linksDirty = [...linkedPageIds].sort().join(',') !== [...originalPageIdsRef.current].sort().join(',')
+  const isDirty = formDirty || linksDirty
+  const canSave = formData.title.trim() && (mode === 'create' || isDirty) && !isLoading && !isDeleting && !pagesLoading
+
+  useEffect(() => {
+    if (!isOpen) return
+    let current = true
+    setPagesLoading(true)
+    setShowPagePicker(initialOpenPages)
+    setPageSearch('')
+    setPages([])
+    setLinkedPageIds([])
+    originalPageIdsRef.current = []
+    createdTaskRef.current = null
+    Promise.all([getPages(), mode === 'edit' && task?.id ? getPageIdsForTask(task.id) : Promise.resolve({ success: true, data: [] })])
+      .then(([pageResponse, linksResponse]) => {
+        if (!current) return
+        if (pageResponse.success) setPages(pageResponse.data || [])
+        else setErrors(previous => ({ ...previous, pages: pageResponse.error || 'Could not load pages' }))
+        if (linksResponse.success) {
+          const ids = linksResponse.data || []
+          setLinkedPageIds(ids)
+          originalPageIdsRef.current = ids
+        } else setErrors(previous => ({ ...previous, pages: linksResponse.error || 'Could not load linked pages' }))
+        setPagesLoading(false)
+      })
+    return () => { current = false }
+  }, [isOpen, panelKey])
+
+  const savePageLinks = async taskId => {
+    const original = originalPageIdsRef.current
+    for (const pageId of linkedPageIds.filter(id => !original.includes(id))) {
+      const response = await linkTaskToPage(pageId, taskId)
+      if (!response.success) throw new Error(response.error || 'Could not link page')
+    }
+    for (const pageId of original.filter(id => !linkedPageIds.includes(id))) {
+      const response = await unlinkTaskFromPage(pageId, taskId)
+      if (!response.success) throw new Error(response.error || 'Could not unlink page')
+    }
+    originalPageIdsRef.current = linkedPageIds
+  }
 
   // Focus title input when panel opens
   useEffect(() => {
@@ -85,65 +132,6 @@ function TaskSidePanel({
       titleInputRef.current.setSelectionRange(length, length)
     }
   }, [isOpen])
-
-  // Close dropdowns when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      // Check if click is inside any dropdown container OR inside DateTimePicker portal
-      const dropdowns = document.querySelectorAll('.dropdown-container')
-      const dateTimePickers = document.querySelectorAll('[class*="fixed bg-white rounded-xl shadow-2xl"]')
-      
-      let clickedInside = false
-      
-      // Check dropdown containers
-      dropdowns.forEach(dropdown => {
-        if (dropdown.contains(e.target)) {
-          clickedInside = true
-        }
-      })
-      
-      // Check DateTimePicker portals
-      dateTimePickers.forEach(picker => {
-        if (picker.contains(e.target)) {
-          clickedInside = true
-        }
-      })
-      
-      if (!clickedInside) {
-        // Add small delay to prevent immediate closing after opening
-        setTimeout(() => {
-          setShowDueDatePicker(false)
-          setShowScheduledDatePicker(false)
-          setShowRecurrenceEndDatePicker(false)
-        }, 10)
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [showDueDatePicker, showScheduledDatePicker, showRecurrenceEndDatePicker])
-
-  const calculateDropdownPosition = (buttonRef) => {
-    if (!buttonRef?.current) return { top: 200, left: 200 }
-    
-    const rect = buttonRef.current.getBoundingClientRect()
-    
-    // Simple positioning - just place it below the button
-    let top = rect.bottom + window.scrollY + 5
-    let left = rect.left + window.scrollX
-    
-    // Simple adjustments to keep it in viewport
-    if (left + 320 > window.innerWidth) {
-      left = window.innerWidth - 330
-    }
-    if (left < 10) left = 10
-    
-    if (top + 320 > window.innerHeight + window.scrollY) {
-      top = rect.top + window.scrollY - 330
-    }
-    if (top < window.scrollY + 10) top = window.scrollY + 10
-    
-    return { top, left }
-  }
 
   const buildTaskPayload = () => {
     return {
@@ -172,7 +160,8 @@ function TaskSidePanel({
   }
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
+    e?.preventDefault()
+    if (mode === 'edit' && !isDirty) return
     if (!validateForm()) {
       return
     }
@@ -180,11 +169,10 @@ function TaskSidePanel({
     setIsLoading(true)
     try {
       if (mode === 'create') {
-        const response = await onCreateTask(buildTaskPayload())
+        const response = createdTaskRef.current || await onCreateTask(buildTaskPayload())
         if (response.success) {
-          // Create checklist items for the new task
-          await createChecklistItemsForNewTask(response.data.id)
-          
+          createdTaskRef.current = response
+          await savePageLinks(response.data.id)
           onSave(response.data)
           onClose()
         } else {
@@ -195,9 +183,8 @@ function TaskSidePanel({
         const taskPayload = {
           id: task.id,
           ...buildTaskPayload(),
-          checklist: checklist,
         }
-        const response = await onUpdateTask(taskPayload)
+        const response = formDirty ? await onUpdateTask(taskPayload) : { success: true, data: task }
         if (!response.success) {
           setErrors({ submit: response.error })
           setIsLoading(false)
@@ -205,6 +192,7 @@ function TaskSidePanel({
         }
 
         if (response.success) {
+          await savePageLinks(task.id)
           onSave(response.data)
           onClose()
         } else {
@@ -225,26 +213,31 @@ function TaskSidePanel({
     }
   }
 
-  const getPriorityColor = (priority) => {
-    switch (priority) {
-      case 'high': return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-      case 'medium': return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-      case 'low': return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-      default: return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400'
-    }
+  const handleProjectChange = (projectId) => {
+    handleChange('project_id', projectId)
+    if (!projectId) return
+    setRecentProjectIds(previous => {
+      const next = [projectId, ...previous.filter(id => id !== projectId)].slice(0, 5)
+      localStorage.setItem('tasks.recentProjectIds', JSON.stringify(next))
+      return next
+    })
   }
 
-  const getPriorityLabel = (priority) => {
-    const labels = { high: 'High', medium: 'Medium', low: 'Low' }
-    return labels[priority] || 'Medium'
+  const getPriorityColor = (priority) => {
+    switch (priority) {
+      case 'high': return 'border-red-200 bg-red-50 text-red-700'
+      case 'medium': return 'border-amber-200 bg-amber-50 text-amber-700'
+      case 'low': return 'border-emerald-200 bg-emerald-50 text-emerald-700'
+      default: return 'border-slate-200 bg-slate-50 text-slate-600'
+    }
   }
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'completed': return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-      case 'in_progress': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
-      case 'waiting': return 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
-      default: return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400'
+      case 'completed': return 'border-emerald-200 bg-emerald-50 text-emerald-700'
+      case 'in_progress': return 'border-amber-200 bg-amber-50 text-amber-700'
+      case 'waiting': return 'border-violet-200 bg-violet-50 text-violet-700'
+      default: return 'border-sky-200 bg-sky-50 text-sky-700'
     }
   }
 
@@ -257,278 +250,112 @@ function TaskSidePanel({
     return projects.find(p => p.id === formData.project_id)
   }
 
-  const formatDate = (dateString) => {
-    // Handle null, undefined, empty string, and '0' values
-    if (!dateString || dateString === '0' || dateString === '') return 'Not set'
-    
-    try {
-      const date = new Date(dateString)
-      // Check if date is invalid
-      if (isNaN(date.getTime())) return 'Invalid date'
-      
-      // Format the date safely
-      const formatted = date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
-      return formatted
-    } catch (error) {
-      return 'Invalid date'
-    }
-  }
-
   const handleDelete = async () => {
-    if (task && onDelete) {
-      if (window.confirm('Are you sure you want to delete this task?')) {
-        await onDelete(task.id)
-        onClose()
+    if (!task || !onDelete || isDeleting) return
+    if (!window.confirm(`Delete “${task.title}”? This cannot be undone.`)) return
+    setIsDeleting(true)
+    setErrors(previous => ({ ...previous, submit: '' }))
+    try {
+      const response = await onDelete(task.id)
+      if (response?.success === false) throw new Error(response.error || 'Could not delete task')
+      onClose()
+    } catch (error) {
+      setErrors(previous => ({ ...previous, submit: error.toString() }))
+      setIsDeleting(false)
+    }
+  }
+
+  const requestClose = () => {
+    if (isLoading || isDeleting) return
+    if (isDirty && !window.confirm('Discard your unsaved changes?')) return
+    onClose()
+  }
+
+  useEffect(() => {
+    if (!isOpen) return undefined
+    const handleKeyboardShortcut = (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+        event.preventDefault()
+        if (canSave) handleSubmit()
+      } else if (event.key === 'Escape' && !document.querySelector('[data-date-picker]')) {
+        requestClose()
       }
     }
-  }
-
-  // Load checklist items from backend
-  const loadChecklistItems = async (taskId) => {
-    try {
-      const result = await invoke('get_checklist_items_by_task', { taskId })
-      if (result.success && result.data) {
-        // Convert backend data to frontend format
-        const items = result.data.map(item => ({
-          id: item.id,
-          text: item.text,
-          completed: item.is_completed === 1
-        }))
-        setChecklist(items)
-      }
-    } catch (error) {
-      console.error('Failed to load checklist items:', error)
-    }
-  }
-
-  // Create checklist items for new task after it's saved
-  const createChecklistItemsForNewTask = async (taskId) => {
-    // Filter out items that are already created in backend (have numeric IDs)
-    // Backend IDs are typically smaller numbers, local IDs are large timestamps
-    const itemsToCreate = checklist.filter(item => {
-      const idNum = parseInt(item.id)
-      return isNaN(idNum) || idNum > 1000000 // IDs larger than 1M are likely timestamps
-    })
-    
-    // Create items and update their IDs with real database IDs
-    for (let i = 0; i < itemsToCreate.length; i++) {
-      const item = itemsToCreate[i]
-      try {
-        const result = await invoke('create_checklist_item', {
-          req: {
-            task_id: taskId,
-            text: item.text,
-            is_completed: item.completed ? 1 : 0,
-            sort_order: i
-          }
-        })
-        
-        // Replace temporary ID with real database ID
-        if (result.success && result.data) {
-          setChecklist(prev => prev.map(checklistItem => 
-            checklistItem.id === item.id 
-              ? { id: result.data.id, text: result.data.text, completed: result.data.is_completed === 1 }
-              : checklistItem
-          ))
-        }
-      } catch (error) {
-        console.error('Failed to create checklist item:', error)
-      }
-    }
-  }
-
-  // Checklist functions
-  const addChecklistItem = async () => {
-    if (!newChecklistItem.trim()) return
-
-    const newItem = {
-      id: Date.now().toString(),
-      text: newChecklistItem.trim(),
-      completed: false
-    }
-    
-    // Always add to local state immediately
-    setChecklist([...checklist, newItem])
-    setNewChecklistItem('')
-
-    // If task exists, create checklist item immediately
-    if (task?.id) {
-      try {
-        const result = await invoke('create_checklist_item', {
-          req: {
-            task_id: task.id,
-            text: newChecklistItem.trim(),
-            is_completed: 0,
-            sort_order: checklist.length
-          }
-        })
-        
-        if (result.success && result.data) {
-          // Replace temp item with real item from backend
-          setChecklist(prev => prev.map(item => 
-            item.id === newItem.id 
-              ? { id: result.data.id, text: result.data.text, completed: result.data.is_completed === 1 }
-              : item
-          ))
-        }
-      } catch (error) {
-        console.error('Failed to create checklist item:', error)
-        // Revert optimistic update on error
-        setChecklist(prev => prev.filter(item => item.id !== newItem.id))
-      }
-    }
-    // For new tasks, checklist items will be created after task is saved
-  }
-
-  const toggleChecklistItem = async (id) => {
-    const item = checklist.find(item => item.id === id)
-    if (!item) return
-
-    // Optimistic update
-    setChecklist(checklist.map(checklistItem => 
-      checklistItem.id === id ? { ...checklistItem, completed: !checklistItem.completed } : checklistItem
-    ))
-
-    try {
-      await invoke('update_checklist_item', {
-        req: {
-          id: id,
-          is_completed: !item.completed ? 1 : 0
-        }
-      })
-    } catch (error) {
-      console.error('Failed to update checklist item:', error)
-      // Revert optimistic update on error
-      setChecklist(checklist.map(checklistItem => 
-        checklistItem.id === id ? { ...checklistItem, completed: item.completed } : checklistItem
-      ))
-    }
-  }
-
-  const deleteChecklistItem = async (id) => {
-    const itemToDelete = checklist.find(item => item.id === id)
-    if (!itemToDelete) return
-
-    // Optimistic update
-    setChecklist(checklist.filter(item => item.id !== id))
-
-    try {
-      await invoke('delete_checklist_item', { id })
-    } catch (error) {
-      console.error('Failed to delete checklist item:', error)
-      // Revert optimistic update on error
-      setChecklist(prev => [...prev, itemToDelete])
-    }
-  }
-
-  const updateChecklistItem = async (id, text) => {
-    const item = checklist.find(item => item.id === id)
-    if (!item) return
-
-    // Optimistic update
-    setChecklist(checklist.map(checklistItem => 
-      checklistItem.id === id ? { ...checklistItem, text } : checklistItem
-    ))
-
-    try {
-      await invoke('update_checklist_item', {
-        req: {
-          id: id,
-          text: text
-        }
-      })
-    } catch (error) {
-      console.error('Failed to update checklist item:', error)
-      // Revert optimistic update on error
-      setChecklist(checklist.map(checklistItem => 
-        checklistItem.id === id ? { ...checklistItem, text: item.text } : checklistItem
-      ))
-    }
-  }
-
-  const handleChecklistKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      addChecklistItem()
-    }
-  }
+    document.addEventListener('keydown', handleKeyboardShortcut)
+    return () => document.removeEventListener('keydown', handleKeyboardShortcut)
+  }, [isOpen, canSave, isDirty, isLoading, isDeleting])
 
   if (!isOpen) return null
 
   const selectedProject = getSelectedProject()
+  const linkedPages = pages.filter(page => linkedPageIds.includes(page.id))
+  const matchingPages = pages.filter(page => page.title.toLowerCase().includes(pageSearch.toLowerCase()))
+    .sort((a, b) => Number(b.project_id === formData.project_id) - Number(a.project_id === formData.project_id))
+  const recentProjects = recentProjectIds.map(projectId => projects.find(project => project.id === projectId)).filter(Boolean)
+  const quickProjects = [selectedProject, ...recentProjects, ...projects]
+    .filter((project, index, list) => project && list.findIndex(item => item?.id === project.id) === index)
+    .slice(0, 3)
+  const toDateInput = (date) => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+  const todayDate = new Date()
+  const tomorrowDate = new Date(todayDate)
+  tomorrowDate.setDate(tomorrowDate.getDate() + 1)
+  const descriptionIsEmpty = !formData.description || !formData.description.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim()
 
   return (
     <React.Fragment>
       {/* Backdrop */}
-      <div 
-        className="fixed inset-0 bg-black/40 z-[55] transition-opacity"
-        onClick={onClose}
+      <div
+        className="fixed inset-0 z-[55] bg-slate-950/35 transition-opacity"
+        onClick={requestClose}
       />
       
-      {/* Center Panel - Floating with rounded corners */}
-      <div className="fixed left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[90vh] bg-white shadow-2xl z-[60] flex flex-col border border-gray-200 rounded-2xl overflow-hidden animate-scale-in">
-{/* Header */}
-<div className="flex items-center justify-between px-5 py-3 border-b border-gray-200 bg-white flex-shrink-0">
-  {/* Left Section */}
-  <div className="flex items-center gap-1">
-    <button
-      className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-      aria-label="Star task"
-    >
-      <Star className="w-4 h-4" />
-    </button>
-
-    <button
-      className="p-2 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-      aria-label="More options"
-    >
-      <MoreVertical className="w-4 h-4" />
-    </button>
-  </div>
-
-  {/* Right Section */}
-  <button
-    onClick={onClose}
-    className="p-2 text-gray-500 hover:text-red-500 hover:bg-red-100 rounded-lg transition-colors"
-    aria-label="Close panel"
-  >
-    <X className="w-4 h-4" />
-  </button>
-</div>
+      {/* Wide workspace; height stays unchanged. */}
+      <div className="fixed left-1/2 top-1/2 z-[60] flex h-[min(760px,calc(100vh-32px))] w-[1100px] max-w-[calc(100vw-32px)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl animate-scale-in">
+        <div className="flex-shrink-0 border-b border-slate-200 bg-white px-6 py-3">
+          <div className="flex items-start gap-4">
+            <div className="min-w-0 flex-1">
+              <div className="mb-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                <span>{mode === 'create' ? 'New task' : 'Task details'}</span>
+                {mode === 'edit' && task?.created_at && <span className="font-normal normal-case tracking-normal text-slate-400">· Created {formatDate(task.created_at)}</span>}
+              </div>
+              <input
+                ref={titleInputRef}
+                type="text"
+                value={formData.title}
+                onChange={(e) => handleChange('title', e.target.value)}
+                placeholder="Task name"
+                className="w-full border-none bg-transparent text-xl font-semibold tracking-tight text-slate-900 outline-none placeholder:text-slate-400 focus:ring-0"
+              />
+              {errors.title && <p className="mt-1 text-xs font-medium text-red-500">{errors.title}</p>}
+            </div>
+            <button onClick={requestClose} className="grid h-8 w-8 flex-none place-items-center rounded-full border border-slate-200 text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900" aria-label="Close panel" title="Close"><X className="h-4 w-4" /></button>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+            <span className="mr-1 text-[11px] font-semibold text-slate-400">Quick set</span>
+            <button type="button" onClick={() => handleChange('scheduled_date', toDateInput(todayDate))} className="h-7 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 text-xs font-semibold text-indigo-700 transition-colors hover:bg-indigo-100">Today</button>
+            <button type="button" onClick={() => handleChange('scheduled_date', toDateInput(tomorrowDate))} className="h-7 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 text-xs font-semibold text-indigo-700 transition-colors hover:bg-indigo-100">Tomorrow</button>
+            {quickProjects.map(project => (
+              <button key={project.id} type="button" onClick={() => handleProjectChange(project.id)} className={`h-7 max-w-[160px] truncate rounded-full border px-2.5 text-xs font-semibold transition-colors ${formData.project_id === project.id ? 'border-indigo-200 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`} title={project.title}>
+                {project.title}
+              </button>
+            ))}
+          </div>
+        </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-hidden">
-          <div className="flex gap-4 px-4 py-4 h-full">
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <div className="flex h-full min-h-0 gap-0 px-6 py-4">
 {/* Left Column - Task Details */}
-<div className="w-[520px] flex flex-col gap-5 min-h-0">
-  {/* Task Title */}
-  <div className="flex-shrink-0">
-    <input
-      ref={titleInputRef}
-      type="text"
-      value={formData.title}
-      onChange={(e) => handleChange('title', e.target.value)}
-      placeholder="Task name"
-      className="w-full text-2xl font-bold text-gray-900 placeholder-gray-400 bg-transparent border-none focus:outline-none focus:ring-0 pb-1 border-b border-transparent hover:border-gray-300 focus:border-gray-900 transition-colors"
-    />
-
-    {errors.title && (
-      <p className="mt-1.5 text-sm text-red-500">{errors.title}</p>
-    )}
-  </div>
-
+<div className="flex min-h-0 w-[58%] min-w-0 flex-col pr-6">
   {/* Description */}
-  <div className="flex-shrink-0 space-y-2">
-    <div className="flex items-center gap-2">
-      <div className="w-8 h-8 bg-gray-50 rounded-lg  flex items-center justify-center">
-        <FileText className="w-4 h-4 text-gray-600" />
-      </div>
-      <h3 className="text-base font-semibold text-gray-900">
-        Description
-      </h3>
-    </div>
-
-    <div className="w-full h-40 border border-gray-200 rounded-lg overflow-hidden">
+  <div className="flex min-h-0 flex-1 flex-col">
+    <div className="relative min-h-[220px] w-full flex-1 overflow-hidden rounded-xl border border-slate-200 bg-[#fffefa] focus-within:border-indigo-300 focus-within:ring-2 focus-within:ring-indigo-100">
+      {descriptionIsEmpty && <span className="pointer-events-none absolute left-6 top-5 z-10 text-sm font-medium text-slate-400">Description</span>}
       <TipTapEditor
         content={formData.description}
         onChange={(content) => handleChange('description', content)}
@@ -539,115 +366,20 @@ function TaskSidePanel({
     </div>
   </div>
 
-  {/* Checklist Section */}
-  <div className="flex-1 flex flex-col min-h-0 space-y-3">
-    {/* Header */}
-    <div className="flex items-center justify-between flex-shrink-0">
-      <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
-            <div className="w-8 h-8 bg-gray-50 rounded-lg flex items-center justify-center">
-        <CheckSquare className="w-4 h-4 text-black-600" />
-      </div>
-
-        Checklist ({checklist.filter(item => item.completed).length}/{checklist.length})
-      </h3>
-    </div>
-
-    {/* Add new checklist item */}
-    <div className="flex gap-2 flex-shrink-0">
-      <input
-        ref={checklistInputRef}
-        type="text"
-        value={newChecklistItem}
-        onChange={(e) => setNewChecklistItem(e.target.value)}
-        onKeyDown={handleChecklistKeyDown}
-        placeholder="Add checklist item..."
-        className="flex-1 px-3 py-2 text-sm bg-gray-50 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent"
-      />
-
-      <button
-        onClick={addChecklistItem}
-        disabled={!newChecklistItem.trim()}
-        className="w-9 h-9 bg-gray-900 text-white rounded-full hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
-        title="Add checklist item"
-      >
-        <Plus className="w-4 h-4" />
-      </button>
-    </div>
-
-    {/* Checklist items */}
-    <div className="flex-1 overflow-y-auto min-h-0 pr-1">
-      <div className="space-y-2">
-        {checklist.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-10 text-gray-500 border border-dashed border-gray-200 rounded-lg">
-            <CheckSquare className="w-6 h-6 mb-2 text-gray-400" />
-            <p className="text-sm">No checklist items yet</p>
-          </div>
-        ) : (
-          checklist.map((item) => (
-            <div
-              key={item.id}
-              className="flex items-center gap-3 px-3 py-2 bg-white border border-gray-300 rounded-lg hover:border-gray-400 transition-colors"
-            >
-              <input
-                type="checkbox"
-                checked={item.completed}
-                onChange={() => toggleChecklistItem(item.id)}
-                className="flex-shrink-0 rounded border-gray-300 text-gray-900 focus:ring-gray-900 accent-gray-900"
-              />
-
-              <input
-                type="text"
-                value={item.text}
-                onChange={(e) => updateChecklistItem(item.id, e.target.value)}
-                className={`flex-1 bg-transparent border-none focus:outline-none focus:ring-0 text-sm p-0 ${
-                  item.completed
-                    ? 'line-through text-gray-400'
-                    : 'text-gray-900'
-                }`}
-              />
-
-              <button
-                onClick={() => deleteChecklistItem(item.id)}
-                className="flex-shrink-0 p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          ))
-        )}
-      </div>
-    </div>
-  </div>
 </div>
 
             {/* Right Column - Properties */}
-            <div className="w-[400px] space-y-4">
-              {/* Created Time */}
-              <div className="grid grid-cols-2 gap-4 items-center">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 bg-gray-50 rounded-lg flex items-center justify-center">
-                    <Clock className="w-4 h-4 text-gray-600" />
-                  </div>
-                  <div className="text-sm font-medium text-gray-900">Created Time</div>
-                </div>
-                <div className="text-sm text-gray-600">
-                  {task?.created_at ? formatDate(task.created_at) : formatDate(new Date().toISOString())}
-                </div>
-              </div>
+            <div className="no-scrollbar min-h-0 w-[42%] min-w-0 space-y-1 overflow-y-auto border-l border-slate-200 pl-6 pr-1">
+              <div className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Properties</div>
 
               {/* Status */}
-              <div className="grid grid-cols-2 gap-4 items-center">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 bg-gray-50 rounded-lg flex items-center justify-center">
-                    <Loader2 className="w-4 h-4 text-gray-600" />
-                  </div>
-                  <div className="text-sm font-medium text-gray-900">Status</div>
-                </div>
+              <div className="grid min-h-10 grid-cols-[112px_1fr] items-center gap-3 border-b border-slate-200 px-1 py-1.5">
+                <div className="text-xs font-semibold text-slate-500">Status</div>
                 <div className="relative dropdown-container">
                   <Dropdown
                     trigger={
                       <button
-                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-50 text-gray-600 text-sm font-medium hover:bg-gray-100 transition-colors w-full"
+                        className={`flex h-7 w-full items-center gap-2 rounded-full border px-2.5 text-xs font-semibold transition-colors ${getStatusColor(formData.status)}`}
                       >
                         <span className={`w-1.5 h-1.5 rounded-full ${
                           formData.status === 'todo' ? 'bg-blue-500' :
@@ -672,10 +404,10 @@ function TaskSidePanel({
                         onClick={() => {
                           handleChange('status', status.value)
                         }}
-                        className="w-full flex items-center gap-2 px-2 py-1.5 text-sm hover:bg-gray-100 transition-colors"
+                        className={`w-full flex items-center gap-2 px-2 py-1.5 text-sm transition-colors ${formData.status === status.value ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700 hover:bg-slate-50'}`}
                       >
                         <span className={`w-1.5 h-1.5 rounded-full ${status.color}`}></span>
-                        <span className="text-gray-900">{status.label}</span>
+                        <span>{status.label}</span>
                       </button>
                     ))}
                   </Dropdown>
@@ -683,29 +415,24 @@ function TaskSidePanel({
               </div>
 
               {/* Priority */}
-              <div className="grid grid-cols-2 gap-4 items-center">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 bg-gray-50 rounded-lg flex items-center justify-center">
-                    <Check className="w-4 h-4 text-gray-600" />
-                  </div>
-                  <div className="text-sm font-medium text-gray-900">Priority</div>
-                </div>
-                <div className="flex items-center gap-1.5">
+              <div className="grid min-h-10 grid-cols-[112px_1fr] items-center gap-3 border-b border-slate-200 px-1 py-1.5">
+                <div className="text-xs font-semibold text-slate-500">Priority</div>
+                <div className="flex flex-wrap items-center gap-1.5">
                   {[
-                    { value: 'high', label: 'High', color: 'bg-red-500', bgColor: 'bg-red-50 text-red-600', borderColor: 'border-red-500' },
-                    { value: 'medium', label: 'Medium', color: 'bg-yellow-500', bgColor: 'bg-yellow-50 text-yellow-600', borderColor: 'border-yellow-500' },
-                    { value: 'low', label: 'Low', color: 'bg-blue-500', bgColor: 'bg-blue-50 text-blue-600', borderColor: 'border-blue-500' }
+                    { value: 'high', label: 'High', color: 'bg-red-500' },
+                    { value: 'medium', label: 'Medium', color: 'bg-amber-500' },
+                    { value: 'low', label: 'Low', color: 'bg-emerald-500' }
                   ].map((priority) => (
                     <button
                       key={priority.value}
                       onClick={() => handleChange('priority', priority.value)}
-                      className={`flex items-center gap-1 px-2 py-1 rounded-full text-sm font-medium transition-colors border ${
+                      className={`flex h-7 items-center gap-1.5 rounded-full border px-2.5 text-xs font-semibold transition-colors ${
                         formData.priority === priority.value
-                          ? `${priority.bgColor} ${priority.borderColor}`
-                          : 'bg-gray-100 text-gray-600 border-gray-200 hover:bg-gray-100'
+                          ? getPriorityColor(priority.value)
+                          : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-100'
                       }`}
                     >
-                      <span className={`w-1 h-1 rounded-full ${priority.color}`}></span>
+                      <span className={`h-2 w-2 rounded-full ${priority.color}`}></span>
                       {priority.label}
                     </button>
                   ))}
@@ -713,20 +440,15 @@ function TaskSidePanel({
               </div>
 
               {/* Project */}
-              <div className="grid grid-cols-2 gap-4 items-center">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 bg-gray-50 rounded-lg flex items-center justify-center">
-                    <User className="w-4 h-4 text-gray-600" />
-                  </div>
-                  <div className="text-sm font-medium text-gray-900">Project</div>
-                </div>
+              <div className="grid min-h-10 grid-cols-[112px_1fr] items-center gap-3 border-b border-slate-200 px-1 py-1.5">
+                <div className="text-xs font-semibold text-slate-500">Project</div>
                 <div className="relative dropdown-container">
                   <Dropdown
                     trigger={
                       <button
-                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-50 text-gray-600 text-sm font-medium hover:bg-gray-100 transition-colors w-full"
+                        className="flex h-7 w-full items-center gap-2 rounded-full border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-100"
                       >
-                        <span className="w-1.5 h-1.5 rounded-full bg-gray-900"></span>
+                        <span className="h-1.5 w-1.5 rounded-full bg-slate-400"></span>
                         {selectedProject ? selectedProject.title : 'No Project'}
                       </button>
                     }
@@ -735,10 +457,10 @@ function TaskSidePanel({
                   >
                     <button
                       onClick={() => {
-                        handleChange('project_id', null)
+                        handleProjectChange(null)
                       }}
-                      className={`w-full text-left px-2 py-1.5 text-sm hover:bg-gray-100 ${
-                        !formData.project_id ? 'bg-gray-200 text-gray-900' : 'text-gray-900'
+                      className={`w-full text-left px-2 py-1.5 text-sm ${
+                        !formData.project_id ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700 hover:bg-slate-50'
                       }`}
                     >
                       No Project
@@ -747,10 +469,10 @@ function TaskSidePanel({
                       <button
                         key={project.id}
                         onClick={() => {
-                          handleChange('project_id', project.id)
+                          handleProjectChange(project.id)
                         }}
-                        className={`w-full text-left px-2 py-1.5 text-sm hover:bg-gray-100 ${
-                          formData.project_id === project.id ? 'bg-gray-200 text-gray-900' : 'text-gray-900'
+                        className={`w-full text-left px-2 py-1.5 text-sm ${
+                          formData.project_id === project.id ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700 hover:bg-slate-50'
                         }`}
                       >
                         {project.title}
@@ -760,87 +482,43 @@ function TaskSidePanel({
                 </div>
               </div>
 
-              {/* Due Date */}
-              <div className="grid grid-cols-2 gap-4 items-center">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 bg-gray-50 rounded-lg flex items-center justify-center">
-                    <Target className="w-4 h-4 text-gray-600" />
-                  </div>
-                  <div className="text-sm font-medium text-gray-900">Due Date</div>
-                </div>
-                <div className="relative dropdown-container">
-                  <button
-                    ref={dueDateButtonRef}
-                    onClick={() => {
-                      setDatePickerPosition(calculateDropdownPosition(dueDateButtonRef))
-                      setShowDueDatePicker(!showDueDatePicker)
-                    }}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-gray-100 text-gray-600 text-sm font-medium hover:bg-gray-100 transition-colors w-full"
-                  >
-                    <Calendar className="w-3.5 h-3.5" />
-                    {formData.due_date && formData.due_date !== '0' ? formatDate(formData.due_date) : 'Not set'}
+              {/* Linked pages */}
+              <div className="grid min-h-10 grid-cols-[112px_1fr] items-start gap-3 border-b border-slate-200 px-1 py-1.5">
+                <div className="pt-1.5 text-xs font-semibold text-slate-500">Pages</div>
+                <div className="min-w-0">
+                  <button type="button" onClick={() => setShowPagePicker(value => !value)} aria-expanded={showPagePicker} className="flex h-7 w-full items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 text-left text-xs font-semibold text-slate-600 transition-colors hover:border-indigo-200 hover:bg-indigo-50">
+                    <Link2 className="h-3.5 w-3.5 flex-none text-indigo-600" />
+                    <span className="truncate">{pagesLoading ? 'Loading pages…' : linkedPages.length === 1 ? linkedPages[0].title : linkedPages.length ? `${linkedPages.length} linked pages` : 'Link a page'}</span>
                   </button>
-                  {showDueDatePicker && createPortal(
-                    <div>
-                      <DateTimePicker
-                        value={formData.due_date}
-                        onChange={(date) => {
-                          handleChange('due_date', date)
-                          setShowDueDatePicker(false)
-                        }}
-                        onClose={() => setShowDueDatePicker(false)}
-                        position={datePickerPosition}
-                      />
-                    </div>,
-                    document.body
-                  )}
+                  {showPagePicker && <div className="mt-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm">
+                    <input value={pageSearch} onChange={event => setPageSearch(event.target.value)} placeholder="Search pages" className="h-8 w-full rounded-md border border-slate-200 px-2 text-xs outline-none focus:border-indigo-400" />
+                    <div className="no-scrollbar mt-1 max-h-36 overflow-y-auto">
+                      {matchingPages.length ? matchingPages.map(page => <button key={page.id} type="button" onClick={() => setLinkedPageIds(current => current.includes(page.id) ? current.filter(id => id !== page.id) : [...current, page.id])} className="flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-xs text-slate-700 hover:bg-indigo-50">
+                        <span className={`grid h-3.5 w-3.5 flex-none place-items-center rounded border ${linkedPageIds.includes(page.id) ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-300'}`}>{linkedPageIds.includes(page.id) && <Check className="h-2.5 w-2.5" />}</span>
+                        <span className="truncate">{page.title}</span>
+                      </button>) : <p className="px-2 py-2 text-xs text-slate-500">No matching pages</p>}
+                    </div>
+                  </div>}
+                  {errors.pages && <p className="mt-1 text-xs text-red-600">{errors.pages}</p>}
                 </div>
               </div>
 
-              {/* Scheduled Date with Recurrence */}
-              <div className="grid grid-cols-2 gap-4 items-start">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 bg-gray-50 rounded-lg flex items-center justify-center">
-                    <CalendarDays className="w-4 h-4 text-gray-600" />
-                  </div>
-                  <div className="text-sm font-medium text-gray-900">Scheduled</div>
-                </div>
+              {/* Deadline */}
+              <div className="grid min-h-10 grid-cols-[112px_1fr] items-center gap-3 border-b border-slate-200 px-1 py-1.5">
+                <div className="text-xs font-semibold text-slate-500" title="The final deadline for completing this task">Deadline</div>
+                <DatePickerField value={formData.due_date} onChange={date => handleChange('due_date', date)} placeholder="Not set" ariaLabel="Select task deadline" compact className="w-full" />
+              </div>
+
+              {/* Schedule with recurrence */}
+              <div className="grid grid-cols-[112px_1fr] items-start gap-3 border-b border-slate-200 px-1 py-2">
+                <div className="pt-1.5 text-xs font-semibold text-slate-500" title="When you plan to work on this task">Schedule</div>
                 <div className="space-y-2">
-                  <div className="relative dropdown-container">
-                    <button
-                      ref={scheduledDateButtonRef}
-                      onClick={() => {
-                        setDatePickerPosition(calculateDropdownPosition(scheduledDateButtonRef))
-                        setShowScheduledDatePicker(!showScheduledDatePicker)
-                      }}
-                      className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-gray-100 text-gray-600 text-sm font-medium hover:bg-gray-100 transition-colors w-full"
-                    >
-                      <Calendar className="w-3.5 h-3.5" />
-                      {formData.scheduled_date && formData.scheduled_date !== '0' ? formatDate(formData.scheduled_date) : 'Not set'}
-                    </button>
-                    {showScheduledDatePicker && createPortal(
-                      <div>
-                        <DateTimePicker
-                          value={formData.scheduled_date}
-                          onChange={(date) => {
-                            handleChange('scheduled_date', date)
-                            setShowScheduledDatePicker(false)
-                          }}
-                          onClose={() => setShowScheduledDatePicker(false)}
-                          position={datePickerPosition}
-                        />
-                      </div>,
-                      document.body
-                    )}
-                  </div>
+                  <DatePickerField value={formData.scheduled_date} onChange={date => handleChange('scheduled_date', date)} placeholder="Not set" ariaLabel="Select task schedule date" compact className="w-full" />
 
                   {/* Recurring Toggle & Options */}
                   <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 bg-gray-50 rounded-lg flex items-center justify-center">
-                        <Timer className="w-4 h-4 text-gray-600" />
-                      </div>
-                      <div className="text-sm font-medium text-gray-900">Repeat</div>
+                    <div className="flex items-center justify-between gap-2 rounded-lg bg-white px-2 py-1.5">
+                      <div className="text-xs font-semibold text-slate-500">Repeat</div>
                       <button
                         onClick={() => {
                           const newValue = !formData.is_recurring
@@ -852,7 +530,7 @@ function TaskSidePanel({
                           }
                         }}
                         className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                          formData.is_recurring ? 'bg-gray-900' : 'bg-gray-300'
+                          formData.is_recurring ? 'bg-indigo-500' : 'bg-slate-300'
                         }`}
                       >
                         <span
@@ -868,9 +546,9 @@ function TaskSidePanel({
                         <Dropdown
                           trigger={
                             <button
-                              className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-50 text-gray-600 text-sm font-medium hover:bg-gray-100 transition-colors w-full"
+                              className="flex h-7 w-full items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 text-xs font-semibold text-indigo-700 transition-colors hover:bg-indigo-100"
                             >
-                              <span className="w-1.5 h-1.5 rounded-full bg-gray-900"></span>
+                              <span className="h-1.5 w-1.5 rounded-full bg-indigo-500"></span>
                               {formData.recurrence_type ? formData.recurrence_type.charAt(0).toUpperCase() + formData.recurrence_type.slice(1).replace('_', ' ') : 'Pattern'}
                             </button>
                           }
@@ -904,14 +582,9 @@ function TaskSidePanel({
               </div>
 
               {/* Time Tracking */}
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-4 items-center">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 bg-gray-50 rounded-lg flex items-center justify-center">
-                      <Timer className="w-4 h-4 text-gray-600" />
-                    </div>
-                    <div className="text-sm font-medium text-gray-900">Estimated Time</div>
-                  </div>
+              <div className="space-y-1">
+                <div className="grid min-h-10 grid-cols-[112px_1fr] items-center gap-3 border-b border-slate-200 px-1 py-1.5">
+                  <div className="text-xs font-semibold text-slate-500">Estimated time</div>
                   <div className="flex items-center gap-1.5">
                     <input
                       type="number"
@@ -922,20 +595,15 @@ function TaskSidePanel({
                       }}
                       placeholder="0"
                       min="0"
-                      className="w-16 px-2 py-1 rounded-full bg-gray-50 border border-gray-200 text-gray-600 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-gray-900"
+                      className="h-7 w-16 rounded-full border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-600 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
                     />
-                    <span className="text-sm text-gray-600">minutes</span>
+                    <span className="text-xs text-slate-500">minutes</span>
                   </div>
                 </div>
                 
                 {mode === 'edit' && (
-                  <div className="grid grid-cols-2 gap-4 items-center">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 bg-gray-50 rounded-lg flex items-center justify-center">
-                        <Timer className="w-4 h-4 text-gray-600" />
-                      </div>
-                      <div className="text-sm font-medium text-gray-900">Actual Time</div>
-                    </div>
+                  <div className="grid min-h-10 grid-cols-[112px_1fr] items-center gap-3 px-1 py-1.5">
+                    <div className="text-xs font-semibold text-slate-500">Actual time</div>
                     <div className="flex items-center gap-1.5">
                       <input
                         type="number"
@@ -946,9 +614,9 @@ function TaskSidePanel({
                         }}
                         placeholder="0"
                         min="0"
-                        className="w-16 px-2 py-1 rounded-full bg-gray-100 border border-gray-200 text-gray-600 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-gray-900"
+                        className="h-7 w-16 rounded-full border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-600 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
                       />
-                      <span className="text-sm text-gray-600">minutes</span>
+                      <span className="text-xs text-slate-500">minutes</span>
                     </div>
                   </div>
                 )}
@@ -957,39 +625,48 @@ function TaskSidePanel({
           </div>
         </div>
 
-        {/* Save Button - Floating */}
-        <div className="px-5 py-4 border-t border-gray-200 bg-gray-50">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+        {/* Actions */}
+        <div className="flex-shrink-0 border-t border-slate-200 bg-white px-6 py-3">
+          {errors.submit && <p className="mb-2 text-right text-xs font-medium text-red-600">{errors.submit}</p>}
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex min-w-0 items-center gap-3">
               {mode === 'edit' && (
                 <button
+                  type="button"
                   onClick={handleDelete}
-                  className="px-3 py-1.5 text-red-600 bg-red-50 border border-red-200 rounded-full hover:bg-red-100 transition-colors text-sm font-medium flex items-center gap-1.5"
+                  disabled={isLoading || isDeleting}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-full border border-red-200 bg-white px-3.5 text-xs font-semibold text-red-600 transition-colors hover:border-red-300 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
-                  Delete Task
+                  {isDeleting ? 'Deleting…' : 'Delete'}
                 </button>
               )}
+              {isDirty && <span className="truncate text-xs font-medium text-amber-600">Unsaved changes</span>}
             </div>
             <div className="flex items-center gap-2">
               <button
-                onClick={onClose}
-                className="px-4 py-1.5 text-gray-600 bg-white border border-gray-300 rounded-full hover:bg-gray-100 transition-colors text-sm font-medium"
+                type="button"
+                onClick={requestClose}
+                disabled={isLoading || isDeleting}
+                className="h-9 rounded-full border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Cancel
               </button>
               <button
+                type="button"
                 onClick={handleSubmit}
-                disabled={isLoading}
-                className="flex items-center gap-1.5 px-4 py-1.5 bg-gray-900 text-white rounded-full hover:bg-gray-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={!canSave}
+                className="inline-flex h-9 min-w-[124px] items-center justify-center gap-1.5 rounded-full border border-indigo-600 bg-indigo-600 px-4 text-xs font-semibold text-white transition-colors hover:border-indigo-700 hover:bg-indigo-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-200 disabled:text-slate-400"
+                title="Save task (Ctrl+Enter)"
               >
                 {isLoading ? (
                   <>
-                    <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-white"></div>
-                    Saving...
+                    <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/40 border-t-white"></div>
+                    Saving…
                   </>
                 ) : (
                   <>
+                    <Check className="h-4 w-4" />
                     {mode === 'create' ? 'Create Task' : 'Save Changes'}
                   </>
                 )}

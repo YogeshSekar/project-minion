@@ -1,9 +1,9 @@
 import React, { useState } from 'react'
 import { ChevronDown, ChevronUp, Clock3, CalendarDays, TimerReset, Pencil, Trash2 } from 'lucide-react'
 
-export default function GroupedActivityCard({ group, getTaskTitle, getProjectTitle, openEditModal, openDeleteConfirm }) {
+export default function GroupedActivityCard({ group, getTaskTitle, getProjectTitle, getMeetingTitle, openEditModal, openDeleteConfirm }) {
   const [isOpen, setIsOpen] = useState(true)
-  const title = group.task_id ? getTaskTitle(group.task_id) : (group.project_id ? getProjectTitle(group.project_id) : 'No Task')
+  const title = group.task_id ? getTaskTitle(group.task_id) : group.meeting_id ? getMeetingTitle(group.meeting_id) : (group.project_id ? getProjectTitle(group.project_id) : 'General activity')
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 p-3 hover:shadow-sm transition-all">
@@ -21,7 +21,7 @@ export default function GroupedActivityCard({ group, getTaskTitle, getProjectTit
           <div className="min-w-0">
             <h4 className="text-sm font-medium text-gray-900 truncate">{title}</h4>
             <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
-              <span>{group.activities.length} activities</span>
+              <span>{group.activities.length} {group.meeting_id ? 'meeting sessions' : 'activities'}</span>
               <span>•</span>
               <span>{group.totalMinutes}m</span>
             </div>
@@ -46,7 +46,7 @@ export default function GroupedActivityCard({ group, getTaskTitle, getProjectTit
                   {activity.end_time && (
                     <span className="flex items-center gap-1"><TimerReset className="w-3 h-3" />{new Date(activity.end_time).toLocaleString()}</span>
                   )}
-                  <span className="flex items-center gap-1"><Clock3 className="w-3 h-3" />{activity.duration_minutes === null ? 'Running' : `${activity.duration_minutes}m`}</span>
+                  <span className="flex items-center gap-1"><Clock3 className="w-3 h-3" />{activity.duration_seconds == null && activity.duration_minutes === null ? 'Running' : activity.duration_seconds != null && activity.duration_seconds < 60 ? `${activity.duration_seconds}s` : `${Math.round((activity.duration_seconds ?? activity.duration_minutes * 60) / 60)}m`}</span>
                 </div>
               </div>
 

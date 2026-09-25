@@ -1,15 +1,15 @@
-use chrono::{Datelike, Duration, NaiveDate, Utc};
-use sqlx::{Pool, Sqlite};
 use crate::database::models::task::Task;
 use crate::database::models::task_completion_log::TaskCompletionLog;
+use chrono::{Datelike, Duration, NaiveDate, Utc};
+use sqlx::{Pool, Sqlite};
 
 /// Calculates the next scheduled date based on recurrence pattern
-/// 
+///
 /// # Arguments
 /// * `current_date` - Current date in YYYY-MM-DD format
 /// * `recurrence_type` - Type of recurrence: "daily", "weekly", "bi_weekly", "weekdays_only", or "monthly"
 /// * `recurrence_interval` - Interval for recurrence (e.g., 1 for every day, 2 for every 2 weeks)
-/// 
+///
 /// # Returns
 /// * `Ok(String)` - Next date in YYYY-MM-DD format
 /// * `Err(String)` - Error message if calculation fails
@@ -23,12 +23,8 @@ pub fn calculate_next_scheduled_date(
         .map_err(|e| format!("Invalid date format: {}", e))?;
 
     let next_date = match recurrence_type {
-        "daily" => {
-            date + Duration::days(recurrence_interval)
-        }
-        "weekly" => {
-            date + Duration::weeks(recurrence_interval)
-        }
+        "daily" => date + Duration::days(recurrence_interval),
+        "weekly" => date + Duration::weeks(recurrence_interval),
         "bi_weekly" => {
             // Bi-weekly means every 2 weeks
             date + Duration::weeks(2)
@@ -36,12 +32,12 @@ pub fn calculate_next_scheduled_date(
         "weekdays_only" => {
             // For weekdays only, find the next weekday (Monday-Friday)
             let mut next_date = date + Duration::days(1);
-            
+
             // Skip weekends (Saturday = 6, Sunday = 7 in chrono's weekday numbering)
             while next_date.weekday().num_days_from_monday() >= 5 {
                 next_date = next_date + Duration::days(1);
             }
-            
+
             next_date
         }
         "monthly" => {
@@ -49,7 +45,7 @@ pub fn calculate_next_scheduled_date(
             let mut year = date.year();
             let mut month = date.month() as i32 + recurrence_interval as i32;
             let day = date.day();
-            
+
             // Handle year overflow
             while month > 12 {
                 month -= 12;
@@ -59,23 +55,25 @@ pub fn calculate_next_scheduled_date(
                 month += 12;
                 year -= 1;
             }
-            
+
             // Create the new date, adjusting for invalid days (e.g., Feb 30)
             let mut next_date_candidate = NaiveDate::from_ymd_opt(year, month as u32, day);
-            
+
             // If the day is invalid for the month (e.g., 31st in a 30-day month), use the last valid day
             if next_date_candidate.is_none() {
                 // Get the last day of the target month
                 let next_month = if month == 12 { 1 } else { month + 1 };
                 let next_month_year = if month == 12 { year + 1 } else { year };
-                let last_day_of_month = NaiveDate::from_ymd_opt(next_month_year, next_month as u32, 1)
-                    .unwrap_or_else(|| NaiveDate::from_ymd_opt(year, month as u32, 1).unwrap())
-                    - Duration::days(1);
-                
+                let last_day_of_month =
+                    NaiveDate::from_ymd_opt(next_month_year, next_month as u32, 1)
+                        .unwrap_or_else(|| NaiveDate::from_ymd_opt(year, month as u32, 1).unwrap())
+                        - Duration::days(1);
+
                 next_date_candidate = Some(last_day_of_month);
             }
-            
-            next_date_candidate.ok_or_else(|| "Failed to calculate next monthly date".to_string())?
+
+            next_date_candidate
+                .ok_or_else(|| "Failed to calculate next monthly date".to_string())?
         }
         _ => {
             return Err(format!("Unsupported recurrence type: {}", recurrence_type));
@@ -86,11 +84,11 @@ pub fn calculate_next_scheduled_date(
 }
 
 /// Completes a recurring task by creating a completion log and scheduling the next occurrence
-/// 
+///
 /// # Arguments
 /// * `db_pool` - Database connection pool
 /// * `task` - The task to complete (must be recurring)
-/// 
+///
 /// # Returns
 /// * `Ok<TaskCompletionLog>` - The created completion log
 /// * `Err(String)` - Error description if validation or database operations fail
@@ -99,7 +97,9 @@ pub async fn complete_recurring_task(
     task: &Task,
 ) -> Result<TaskCompletionLog, String> {
     // Start a transaction for atomic operations
-    let mut tx = db_pool.begin().await
+    let mut tx = db_pool
+        .begin()
+        .await
         .map_err(|e| format!("Failed to start transaction: {}", e))?;
 
     // 1. Validate task
@@ -107,9 +107,11 @@ pub async fn complete_recurring_task(
         return Err("Task is not recurring".to_string());
     }
 
-    let recurrence_type = task.recurrence_type.as_ref()
+    let recurrence_type = task
+        .recurrence_type
+        .as_ref()
         .ok_or("Task missing recurrence_type")?;
-    
+
     // Handle null scheduled_date by using current date - own the String to avoid dangling references
     let owned_scheduled_date = if let Some(date) = task.scheduled_date.as_ref() {
         date.clone()
@@ -120,9 +122,12 @@ pub async fn complete_recurring_task(
 
     // 2. Insert row into task_completion_logs
     let current_timestamp = Utc::now().format("%Y-%m-%d %H:%M:%S").to_string();
-    
-    println!("DEBUG: complete_recurring_task - task_id: {}, scheduled_date: {}, next will be calculated", task.id, owned_scheduled_date);
-    
+
+    println!(
+        "DEBUG: complete_recurring_task - task_id: {}, scheduled_date: {}, next will be calculated",
+        task.id, owned_scheduled_date
+    );
+
     let completion_log = sqlx::query_as::<_, TaskCompletionLog>(
         r#"
         INSERT INTO task_completion_logs (task_id, occurrence_date, completed_at, is_undone)
@@ -142,11 +147,15 @@ pub async fn complete_recurring_task(
         &owned_scheduled_date,
         recurrence_type,
         task.recurrence_interval.unwrap_or(1) as i64,
-    ).map_err(|e| format!("Failed to calculate next scheduled date: {}", e))?;
+    )
+    .map_err(|e| format!("Failed to calculate next scheduled date: {}", e))?;
 
     // 4. Update task with next scheduled date and reset status
-    println!("DEBUG: Updating task {} - new scheduled_date: {}, resetting status to todo", task.id, next_scheduled_date);
-    
+    println!(
+        "DEBUG: Updating task {} - new scheduled_date: {}, resetting status to todo",
+        task.id, next_scheduled_date
+    );
+
     sqlx::query(
         r#"
         UPDATE tasks 
@@ -161,10 +170,14 @@ pub async fn complete_recurring_task(
     .map_err(|e| format!("Failed to update task scheduled date: {}", e))?;
 
     // Commit the transaction
-    tx.commit().await
+    tx.commit()
+        .await
         .map_err(|e| format!("Failed to commit transaction: {}", e))?;
 
-    println!("DEBUG: Successfully completed recurring task {} - next scheduled: {}", task.id, next_scheduled_date);
+    println!(
+        "DEBUG: Successfully completed recurring task {} - next scheduled: {}",
+        task.id, next_scheduled_date
+    );
     Ok(completion_log)
 }
 

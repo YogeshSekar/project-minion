@@ -2,21 +2,34 @@ import {
   createActivity,
   updateActivity,
   deleteActivity,
-  getRunningActivity
+  getRunningActivity,
+  getActivityAnalytics
 } from './api'
 
 function generateSessionGroupId() {
   return `session_${Date.now()}`
 }
 
-function calculateDurationMinutes(startTime, endTime) {
+function calculateDurationSeconds(startTime, endTime) {
   const start = new Date(startTime)
   const end = new Date(endTime)
-  return Math.max(1, Math.round((end - start) / 60000))
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) {
+    throw new Error('Activity end time must be after its start time')
+  }
+  return Math.max(0, Math.round((end - start) / 1000))
+}
+
+const durationMinutes = seconds => Math.round(seconds / 60)
+
+function normalizeReference(payload) {
+  if (payload.reference_type) return { reference_type: payload.reference_type, reference_id: payload.reference_id || null }
+  if (payload.project_id) return { reference_type: 'project', reference_id: payload.project_id }
+  return { reference_type: 'general', reference_id: null }
 }
 
 export async function startActivity(payload) {
   try {
+    const reference = normalizeReference(payload)
     const runningResponse = await getRunningActivity()
     
     if (runningResponse.success && runningResponse.data) {
@@ -27,12 +40,12 @@ export async function startActivity(payload) {
       title: payload.title,
       description: payload.description || null,
       activity_type: payload.activity_type,
-      reference_type: payload.reference_type || null,
-      reference_id: payload.reference_id || null,
+      ...reference,
       session_group_id: generateSessionGroupId(),
       start_time: new Date().toISOString(),
       end_time: null,
       duration_minutes: null,
+      duration_seconds: null,
       status: 'running',
       source: payload.source || 'manual',
       is_auto_tracked: payload.is_auto_tracked || 0,
@@ -62,7 +75,7 @@ export async function stopCurrentActivity(existingRunningActivity = null) {
     }
     
     const endTime = new Date().toISOString()
-    const duration = calculateDurationMinutes(activity.start_time, endTime)
+    const seconds = calculateDurationSeconds(activity.start_time, endTime)
     
     const updateRequest = {
       id: activity.id,
@@ -74,7 +87,8 @@ export async function stopCurrentActivity(existingRunningActivity = null) {
       session_group_id: activity.session_group_id,
       start_time: activity.start_time,
       end_time: endTime,
-      duration_minutes: duration,
+      duration_minutes: durationMinutes(seconds),
+      duration_seconds: seconds,
       status: 'completed',
       source: activity.source,
       is_auto_tracked: activity.is_auto_tracked,
@@ -101,18 +115,19 @@ export async function switchActivity(payload) {
 
 export async function createManualCompletedActivity(payload) {
   try {
-    const duration = calculateDurationMinutes(payload.start_time, payload.end_time)
+    const seconds = calculateDurationSeconds(payload.start_time, payload.end_time)
+    const reference = normalizeReference(payload)
     
     const activityRequest = {
       title: payload.title,
       description: payload.description || null,
       activity_type: payload.activity_type,
-      reference_type: payload.reference_type || null,
-      reference_id: payload.reference_id || null,
+      ...reference,
       session_group_id: generateSessionGroupId(),
       start_time: payload.start_time,
       end_time: payload.end_time,
-      duration_minutes: duration,
+      duration_minutes: durationMinutes(seconds),
+      duration_seconds: seconds,
       status: 'completed',
       source: payload.source || 'manual',
       is_auto_tracked: payload.is_auto_tracked || 0,
@@ -140,6 +155,7 @@ export async function updateExistingActivity(payload) {
       start_time: payload.start_time,
       end_time: payload.end_time,
       duration_minutes: payload.duration_minutes,
+      duration_seconds: payload.duration_seconds,
       status: payload.status,
       source: payload.source,
       is_auto_tracked: payload.is_auto_tracked,
@@ -158,6 +174,14 @@ export async function deleteExistingActivity(id) {
   try {
     const response = await deleteActivity(id)
     return response
+  } catch (error) {
+    return { success: false, data: null, error: error.toString() }
+  }
+}
+
+export async function fetchActivityAnalytics(startTime, endTime) {
+  try {
+    return await getActivityAnalytics(startTime, endTime)
   } catch (error) {
     return { success: false, data: null, error: error.toString() }
   }

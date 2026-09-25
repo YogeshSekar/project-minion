@@ -8,6 +8,10 @@ export async function getActivities() {
   return await invoke('get_activities')
 }
 
+export async function getActivityAnalytics(startTime, endTime) {
+  return await invoke('get_activity_analytics', { startTime, endTime })
+}
+
 export async function getActivityById(id) {
   return await invoke('get_activity_by_id', { id })
 }
@@ -89,6 +93,60 @@ export async function deleteNote(id) {
   return await invoke('delete_note', { id })
 }
 
+// Area API functions
+export async function getAllAreas() {
+  return await invoke('get_all_areas')
+}
+
+export async function getAreasByProject(projectId) {
+  return await invoke('get_areas_by_project', { projectId })
+}
+
+export async function getArea(id) {
+  return await invoke('get_area', { id })
+}
+
+export async function createArea(request) {
+  return await invoke('create_area', { request })
+}
+
+export async function updateArea(request) {
+  return await invoke('update_area', { request })
+}
+
+export async function deleteArea(id) {
+  return await invoke('delete_area', { id })
+}
+
+// Page API functions
+export async function getAllPages() {
+  return await invoke('get_all_pages')
+}
+
+export async function getPagesByProject(projectId) {
+  return await invoke('get_pages_by_project', { projectId })
+}
+
+export async function getPagesByArea(areaId) {
+  return await invoke('get_pages_by_area', { areaId })
+}
+
+export async function getPage(id) {
+  return await invoke('get_page', { id })
+}
+
+export async function createPage(request) {
+  return await invoke('create_page', { request })
+}
+
+export async function updatePage(request) {
+  return await invoke('update_page', { request })
+}
+
+export async function deletePage(id) {
+  return await invoke('delete_page', { id })
+}
+
 // Meeting API functions
 export async function getAllMeetings() {
   return await invoke('get_all_meetings')
@@ -110,27 +168,3 @@ export async function getOutlookMeetings(date) {
   return await invoke('get_outlook_meetings', { date })
 }
 
-// Habit API functions
-export async function getAllHabits() {
-  return await invoke('get_all_habits')
-}
-
-export async function createHabit(request) {
-  return await invoke('create_habit', { request })
-}
-
-export async function updateHabit(request) {
-  return await invoke('update_habit', { request })
-}
-
-export async function deleteHabit(id) {
-  return await invoke('delete_habit', { id })
-}
-
-export async function toggleHabitCompletion(habitId, date) {
-  return await invoke('toggle_habit_completion', { habitId, date })
-}
-
-export async function getHabitLogs(habitId) {
-  return await invoke('get_habit_logs', { habitId })
-}

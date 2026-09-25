@@ -1,1318 +1,345 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { invoke } from '@tauri-apps/api/core'
-import { ChevronLeft, ChevronRight, Calendar, Clock, MapPin, Users, Briefcase, Video, Edit3, Save, X, Plus, List, LayoutGrid, Filter, ArrowUpDown, MoreVertical, Star, Paperclip, Loader2, Check } from 'lucide-react'
+import { ArrowRight, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock3, FileText, FolderKanban, Link2, ListTodo, MapPin, MessageSquareText, Play, Plus, RefreshCw, Square, Unlink2, Video, X } from 'lucide-react'
 import useProjects from '../hooks/useProjects'
-import useClickOutside from '../hooks/useClickOutside'
-import MeetingView from '../components/MeetingView'
+import usePages from '../hooks/usePages'
+import useTasks from '../hooks/useTasks'
+import TipTapEditor from '../components/TipTapEditor'
+import DatePickerField from '../components/DatePickerField'
+import Select from '../components/ui/Select'
+import { getTaskIdsForPage } from '../services/pageTaskService'
+import { getPageUpdates } from '../services/pageUpdateService'
+import { sanitizeUpdateHtml } from '../utils/updateContent'
+import { startActivity, stopCurrentActivity, updateExistingActivity } from '../services/activityService'
 
-// Date navigator helper functions
-const getWeekDays = (selectedDate) => {
-  const days = []
-  const startOfWeek = new Date(selectedDate)
-  const day = startOfWeek.getDay()
-  const diff = startOfWeek.getDate() - day + (day === 0 ? -6 : 1)
-  startOfWeek.setDate(diff)
-  
-  for (let i = 0; i < 7; i++) {
-    const day = new Date(startOfWeek)
-    day.setDate(startOfWeek.getDate() + i)
-    days.push(day)
-  }
-  return days
+const localDate = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+const addDays = (value, days) => {
+  const [year, month, day] = value.split('-').map(Number)
+  return localDate(new Date(year, month - 1, day + days))
 }
-
-const formatDateLabel = (date) => {
-  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+const dateLabel = value => {
+  const [year, month, day] = value.split('-').map(Number)
+  return new Date(year, month - 1, day).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })
 }
+const timeLabel = value => value ? new Date(value).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '—'
+const meetingKey = meeting => meeting.entry_id || `${meeting.start || ''}:${meeting.subject || ''}`
+const locationUrl = location => location?.match(/https?:\/\/[^\s<>]+/i)?.[0] || ''
+const isCanceled = meeting => /^cancel(?:ed|led)\s*:/i.test(meeting?.subject || '')
+const meetingTitle = meeting => (meeting?.subject || 'Untitled meeting').replace(/^cancel(?:ed|led)\s*:\s*/i, '')
 
-function MeetingsPage() {
-  const [selectedMeeting, setSelectedMeeting] = useState(null)
-  const [selectedDate, setSelectedDate] = useState(new Date())
-  const [meetingNotes, setMeetingNotes] = useState({})
-  const [isEditingNotes, setIsEditingNotes] = useState(false)
-  const [currentNotes, setCurrentNotes] = useState('')
+function MeetingsPage({ onOpenPage, meetingToOpen, onMeetingOpened, runningActivity, onActivityStarted, onActivityStopped }) {
+  const [date, setDate] = useState(() => meetingToOpen?.start ? localDate(new Date(meetingToOpen.start)) : localDate(new Date()))
   const [meetings, setMeetings] = useState([])
+  const [savedMeetings, setSavedMeetings] = useState({})
+  const [selectedIndex, setSelectedIndex] = useState(0)
+  const [linkedPages, setLinkedPages] = useState([])
+  const [selectedPageId, setSelectedPageId] = useState(null)
+  const [pageView, setPageView] = useState('content')
+  const tabRailRef = useRef(null)
+  const tabRefs = useRef(new Map())
+  const [tabIndicator, setTabIndicator] = useState({ left: 0, width: 0, visible: false })
+  const [pageTaskIds, setPageTaskIds] = useState([])
+  const [pageUpdates, setPageUpdates] = useState([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [viewMode, setViewMode] = useState('list')
-  const [filterOption, setFilterOption] = useState('all')
-  const [sortOption, setSortOption] = useState('start_time')
-  const [calendarMonth, setCalendarMonth] = useState(new Date())
-  const [meetingProjects, setMeetingProjects] = useState({})
-  const [activeTab, setActiveTab] = useState('notes')
-  const [meetingUrls, setMeetingUrls] = useState({})
-  const [isEditingUrl, setIsEditingUrl] = useState(false)
-  const [editedUrl, setEditedUrl] = useState('')
-  const [showMeetingView, setShowMeetingView] = useState(false)
-
-  // Use hooks for data management
-  const { projects, loading: projectsLoading } = useProjects()
-  
-  // Use click-outside hooks for dropdowns
-  const filterDropdown = useClickOutside()
-  const sortDropdown = useClickOutside()
-  const calendarDropdown = useClickOutside()
-  const projectDropdown = useClickOutside()
-
-  // Date navigator functions
-  const weekDays = getWeekDays(selectedDate)
-  
-  const isToday = (date) => {
-    return date.toDateString() === new Date().toDateString()
-  }
-
-  const isSelected = (date) => {
-    return date.toDateString() === selectedDate.toDateString()
-  }
-
-  const handlePrevDay = () => {
-    const newDate = new Date(selectedDate)
-    newDate.setDate(selectedDate.getDate() - 1)
-    setSelectedDate(newDate)
-  }
-
-  const handleNextDay = () => {
-    const newDate = new Date(selectedDate)
-    newDate.setDate(selectedDate.getDate() + 1)
-    setSelectedDate(newDate)
-  }
-
-  const handleToday = () => {
-    setSelectedDate(new Date())
-  }
-
-  // Calendar helper functions
-  const getDaysInMonth = (date) => {
-    const year = date.getFullYear()
-    const month = date.getMonth()
-    const firstDay = new Date(year, month, 1)
-    const lastDay = new Date(year, month + 1, 0)
-    const daysInMonth = lastDay.getDate()
-    const startingDayOfWeek = firstDay.getDay() || 7 // Convert Sunday (0) to 7
-    
-    const days = []
-    // Add empty cells for days before month starts
-    for (let i = 1; i < startingDayOfWeek; i++) {
-      days.push(null)
-    }
-    // Add all days of the month
-    for (let i = 1; i <= daysInMonth; i++) {
-      days.push(new Date(year, month, i))
-    }
-    
-    return days
-  }
-
-  const handleCalendarClick = (date) => {
-    setSelectedDate(date)
-    calendarDropdown.setIsOpen(false)
-  }
-
-  const handleCalendarToggle = () => {
-    if (!calendarDropdown.isOpen) {
-      // Sync calendar to selected date when opening
-      setCalendarMonth(new Date(selectedDate))
-    }
-    calendarDropdown.setIsOpen(!calendarDropdown.isOpen)
-  }
-
-  const handlePrevMonth = () => {
-    setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1))
-  }
-
-  const handleNextMonth = () => {
-    setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1))
-  }
-
-  const formatMonthYear = (date) => {
-    return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-  }
-
-  // Load meetings from Outlook when selected date changes
-  useEffect(() => {
-    loadMeetingsForDateRange()
-  }, [selectedDate])
+  const [error, setError] = useState('')
+  const [actionError, setActionError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [pageSearch, setPageSearch] = useState('')
+  const [editingUrl, setEditingUrl] = useState(false)
+  const [urlDraft, setUrlDraft] = useState('')
+  const [imagePreview, setImagePreview] = useState(null)
+  const [reloadKey, setReloadKey] = useState(0)
+  const { projects } = useProjects()
+  const { pages, loading: pagesLoading, createPage } = usePages()
+  const { tasks } = useTasks()
 
   useEffect(() => {
-    if (selectedMeeting) {
-      setCurrentNotes(meetingNotes[selectedMeeting.id] || '')
-    }
-  }, [selectedMeeting, meetingNotes])
+    if (!imagePreview) return
+    const closeOnEscape = event => { if (event.key === 'Escape') setImagePreview(null) }
+    window.addEventListener('keydown', closeOnEscape)
+    return () => window.removeEventListener('keydown', closeOnEscape)
+  }, [imagePreview])
 
-  const handleProjectSelect = async (projectId) => {
-    console.log('[handleProjectSelect] Called with projectId:', projectId, 'selectedMeeting:', selectedMeeting?.externalId);
-    
-    if (!selectedMeeting) {
-      console.warn('[handleProjectSelect] No meeting selected, cannot assign project');
-      projectDropdown.setIsOpen(false);
-      return;
-    }
-    
-    const externalId = selectedMeeting.externalId || selectedMeeting.entry_id || selectedMeeting.id;
-    if (!externalId) {
-      console.error('[handleProjectSelect] selectedMeeting has no valid ID:', selectedMeeting);
-      projectDropdown.setIsOpen(false);
-      return;
-    }
-    
-    // Note: Project assignment is currently disabled due to database schema limitations
-    // The meetings table does not have a project_id column
-    console.warn('[handleProjectSelect] Project assignment is currently disabled');
-    projectDropdown.setIsOpen(false);
-    
-    // Update local state only for backward compatibility (UI only)
-    setMeetingProjects(prev => ({
-      ...prev,
-      [externalId]: projectId
-      }))
-    
-    projectDropdown.setIsOpen(false)
-  }
-
-  const loadMeetingsForDate = async (date) => {
-    console.log('[loadMeetingsForDate] Loading meetings for date:', date);
-    const meetings = await loadMeetingsWithDbData(date)
-    console.log('[loadMeetingsForDate] Loaded', meetings.length, 'meetings');
-    return meetings
-  }
-
-  const loadMeetingsForDateRange = async () => {
-    try {
+  useEffect(() => {
+    let cancelled = false
+    const load = async () => {
       setLoading(true)
-      setError(null)
-      
-      // Load meetings for selected date and next day
-      const todayMeetings = await loadMeetingsForDate(selectedDate)
-      
-      const tomorrow = new Date(selectedDate)
-      tomorrow.setDate(selectedDate.getDate() + 1)
-      const tomorrowMeetings = await loadMeetingsForDate(tomorrow)
-      
-      setMeetings([...todayMeetings, ...tomorrowMeetings])
-    } catch (error) {
-      console.error('Error loading meetings:', error)
-      setError('Failed to load meetings from Outlook')
-      setMeetings([])
-    } finally {
-      setLoading(false)
+      setError('')
+      setActionError('')
+      setSelectedIndex(0)
+      setLinkedPages([])
+      setSelectedPageId(null)
+      try {
+        const [outlook, saved] = await Promise.all([
+          invoke('get_outlook_meetings', { date }),
+          invoke('get_all_meetings')
+        ])
+        if (cancelled) return
+        if (!saved.success) throw new Error(saved.error || 'Could not load saved meeting details')
+        const rows = Array.isArray(outlook) ? outlook.filter(item => item.start) : []
+        rows.sort((a, b) => new Date(a.start) - new Date(b.start))
+        setMeetings(rows)
+        if (meetingToOpen?.entry_id) {
+          const index = rows.findIndex(item => item.entry_id === meetingToOpen.entry_id)
+          setSelectedIndex(index >= 0 ? index : 0)
+          onMeetingOpened?.()
+        }
+        setSavedMeetings(Object.fromEntries((saved.data || []).filter(item => item.outlook_id).map(item => [item.outlook_id, item])))
+      } catch (cause) {
+        if (cancelled) return
+        setMeetings([])
+        setError(cause?.message || 'Could not load meetings from Outlook')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
     }
-  }
+    load()
+    return () => { cancelled = true }
+  }, [date, reloadKey])
 
-  const loadMeetings = async () => {
-    await loadMeetingsForDateRange()
-  }
+  const meeting = meetings[selectedIndex] || null
+  const outlookId = meeting?.entry_id || null
+  const savedMeeting = outlookId ? savedMeetings[outlookId] : null
+  const selectedProjectId = savedMeeting?.project_id ?? null
+  const meetingUrl = savedMeeting?.meeting_url || locationUrl(meeting?.location)
+  const selectedPage = linkedPages.find(page => page.id === selectedPageId) || linkedPages[0] || null
+  const pageTasks = tasks.filter(task => pageTaskIds.includes(task.id))
+  const isTrackingMeeting = Boolean(savedMeeting?.id && runningActivity?.reference_type === 'meeting' && runningActivity.reference_id === savedMeeting.id)
 
-  // Convert Outlook meeting to display format
-  const convertOutlookMeeting = (outlookMeeting) => {
-    return {
-      id: outlookMeeting.entry_id || outlookMeeting.subject,
-      title: outlookMeeting.subject || 'No Title',
-      description: '',
-      startTime: outlookMeeting.start || '',
-      endTime: outlookMeeting.end || '',
-      location: outlookMeeting.location || 'No Location',
-      attendees: [],
-      priority: 'medium',
-      isRecurring: false,
-      project: null
+  useLayoutEffect(() => {
+    const rail = tabRailRef.current
+    const activeTab = tabRefs.current.get(pageView)
+    if (!rail || !activeTab) {
+      setTabIndicator(current => ({ ...current, visible: false }))
+      return undefined
     }
-  }
+    const updateIndicator = () => setTabIndicator({ left: activeTab.offsetLeft, width: activeTab.offsetWidth, visible: true })
+    updateIndicator()
+    const observer = new ResizeObserver(updateIndicator)
+    observer.observe(rail)
+    observer.observe(activeTab)
+    return () => observer.disconnect()
+  }, [pageView, selectedPage?.id, pageTaskIds.length, pageUpdates.length])
+  const availablePages = useMemo(() => pages
+    .filter(page => page.status !== 'archived')
+    .filter(page => !linkedPages.some(linked => linked.id === page.id))
+    .filter(page => selectedProjectId == null || page.project_id == null || String(page.project_id) === String(selectedProjectId))
+    .filter(page => page.title.toLowerCase().includes(pageSearch.toLowerCase()))
+    .sort((a, b) => Number(String(b.project_id) === String(selectedProjectId)) - Number(String(a.project_id) === String(selectedProjectId)))
+    .slice(0, 12), [pages, linkedPages, selectedProjectId, pageSearch])
 
-  // Date navigation
+  useEffect(() => {
+    let cancelled = false
+    setLinkedPages([])
+    setSelectedPageId(null)
+    setPickerOpen(false)
+    if (!savedMeeting?.id) return () => { cancelled = true }
+    invoke('get_pages_for_meeting', { meetingId: savedMeeting.id }).then(response => {
+      if (cancelled) return
+      if (response.success) {
+        setLinkedPages(response.data || [])
+        setSelectedPageId(response.data?.[0]?.id ?? null)
+      } else setActionError(response.error || 'Could not load linked pages')
+    }).catch(cause => { if (!cancelled) setActionError(cause?.message || 'Could not load linked pages') })
+    return () => { cancelled = true }
+  }, [savedMeeting?.id, outlookId])
 
-  const formatDate = (date) => {
-    return date.toLocaleDateString('en-US', { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+  useEffect(() => {
+    let cancelled = false
+    setPageView('content')
+    setImagePreview(null)
+    setPageTaskIds([])
+    setPageUpdates([])
+    if (!selectedPage?.id) return () => { cancelled = true }
+    Promise.all([getTaskIdsForPage(selectedPage.id), getPageUpdates(selectedPage.id)]).then(([taskResponse, updateResponse]) => {
+      if (cancelled) return
+      if (taskResponse.success) setPageTaskIds(taskResponse.data || [])
+      if (updateResponse.success) setPageUpdates(updateResponse.data || [])
     })
-  }
+    return () => { cancelled = true }
+  }, [selectedPage?.id])
 
-  const getCurrentMeetings = () => {
-    return meetings
-  }
-
-  const getMeetingsForDate = (date) => {
-    return meetings.filter(m => m._date && m._date.toDateString() === date.toDateString())
-  }
-
-  const handleMeetingSelect = async (meeting) => {
-    // Use the new selection logic that merges data
-    await onMeetingSelected(meeting)
-    setIsEditingNotes(false)
-    setIsEditingUrl(false)
-    setActiveTab('notes')
-  }
-
-  const getAllDisplayMeetings = () => {
-    // Get all meetings in order: today's first, then tomorrow's
-    const todayMeetings = getMeetingsForDate(selectedDate)
-    const tomorrow = new Date(selectedDate)
-    tomorrow.setDate(selectedDate.getDate() + 1)
-    const tomorrowMeetings = getMeetingsForDate(tomorrow)
-    return [...todayMeetings, ...tomorrowMeetings].map(m => convertOutlookMeeting(m))
-  }
-
-  const getCurrentMeetingIndex = () => {
-    const allMeetings = getAllDisplayMeetings()
-    // Compare using string IDs to handle any type mismatches
-    return allMeetings.findIndex(m => String(m.id) === String(selectedMeeting?.id))
-  }
-
-  const handlePreviousMeeting = () => {
-    const allMeetings = getAllDisplayMeetings()
-    const currentIndex = getCurrentMeetingIndex()
-    if (currentIndex > 0) {
-      handleMeetingSelect(allMeetings[currentIndex - 1])
+  const storeMeeting = row => setSavedMeetings(current => ({ ...current, [row.outlook_id]: row }))
+  const ensureMeeting = async () => {
+    if (!outlookId) throw new Error('This Outlook event has no stable ID, so it cannot be linked')
+    if (savedMeeting) return savedMeeting
+    const request = {
+      outlook_id: outlookId,
+      title: meeting.subject || 'Untitled meeting',
+      description: null,
+      date,
+      start_time: meeting.start || '',
+      end_time: meeting.end || '',
+      location: meeting.location || null,
+      attendees: null,
+      meeting_url: null,
+      meeting_type: null,
+      project_id: null
     }
+    let response = await invoke('create_meeting', { request })
+    if (!response.success) response = await invoke('get_meeting_by_outlook_id', { outlookId })
+    if (!response.success || !response.data) throw new Error(response.error || 'Could not save meeting')
+    storeMeeting(response.data)
+    return response.data
   }
 
-  const handleNextMeeting = () => {
-    const allMeetings = getAllDisplayMeetings()
-    const currentIndex = getCurrentMeetingIndex()
-    if (currentIndex < allMeetings.length - 1) {
-      handleMeetingSelect(allMeetings[currentIndex + 1])
+  const runAction = async action => {
+    if (busy) return
+    setBusy(true)
+    setActionError('')
+    try { await action() } catch (cause) { setActionError(cause?.message || 'Could not complete the action') }
+    finally { setBusy(false) }
+  }
+
+  const changeProject = projectId => runAction(async () => {
+    if (projectId == null && !savedMeeting) return
+    if (projectId != null && linkedPages.some(page => page.project_id != null && String(page.project_id) !== String(projectId))) {
+      throw new Error('Unlink pages from the other project before changing this meeting’s project')
     }
-  }
-
-  const canGoPrevious = () => {
-    const currentIndex = getCurrentMeetingIndex()
-    return currentIndex > 0
-  }
-
-  const canGoNext = () => {
-    const allMeetings = getAllDisplayMeetings()
-    const currentIndex = getCurrentMeetingIndex()
-    return currentIndex < allMeetings.length - 1
-  }
-
-
-  const saveMeetingToDatabase = async (meeting, updateUrl = false) => {
-    try {
-      const entryId = meeting.entry_id || meeting.id
-      
-      // Check if meeting already exists in database
-      const existingMeetingResponse = await invoke('get_meeting_by_outlook_id', { outlookId: entryId })
-      
-      if (!existingMeetingResponse.success || !existingMeetingResponse.data) {
-        // Create new meeting entry - only save URL if it actually exists
-        const extractedUrl = extractUrlFromLocation(meeting.location)
-        const meetingData = {
-          outlook_id: entryId,
-          title: meeting.title,
-          date: meeting.startTime ? meeting.startTime.split('T')[0] : new Date().toISOString().split('T')[0],
-          start_time: meeting.startTime,
-          end_time: meeting.endTime,
-          location: meeting.location,
-          attendees: meeting.attendees ? JSON.stringify(meeting.attendees) : null,
-          meeting_url: extractedUrl, // Only save extracted URL, not null
-          meeting_type: getMeetingType(meeting),
-          description: null
-        }
-        
-        const response = await invoke('create_meeting', { request: meetingData })
-        if (response.success && response.data) {
-          // Update meeting with database ID and URL
-          meeting.db_id = response.data.id
-          meeting.db_meeting_url = extractedUrl
-          console.log('Meeting saved to database:', response.data)
-        }
-      } else {
-        // Meeting already exists
-        meeting.db_id = existingMeetingResponse.data.id
-        meeting.db_meeting_url = existingMeetingResponse.data.meeting_url
-        
-        // Update URL if requested
-        if (updateUrl) {
-          const currentUrl = getMeetingUrl(meeting) // This gets user-added URL or extracted URL
-          if (currentUrl && currentUrl !== existingMeetingResponse.data.meeting_url) {
-            const updateResponse = await invoke('update_meeting_url', {
-              request: {
-                outlook_id: entryId,
-                meeting_url: currentUrl
-              }
-            })
-            if (updateResponse.success) {
-              meeting.db_meeting_url = currentUrl
-              console.log('Meeting URL updated in database:', currentUrl)
-            }
-          }
-        } else {
-          console.log('Meeting already exists in database:', existingMeetingResponse.data)
-        }
-      }
-    } catch (error) {
-      console.error('Error saving meeting to database:', error)
+    const row = await ensureMeeting()
+    const response = await invoke('set_meeting_project', { outlookId: row.outlook_id, projectId })
+    if (!response.success) throw new Error(response.error || 'Could not change project')
+    storeMeeting(response.data)
+    if (runningActivity?.reference_type === 'meeting' && runningActivity.reference_id === row.id) {
+      const activityResponse = await updateExistingActivity({ ...runningActivity, project_id: projectId })
+      if (!activityResponse.success) throw new Error(activityResponse.error || 'Meeting changed, but its running time entry could not be updated')
+      onActivityStarted?.(activityResponse.data, null)
     }
-  }
+  })
 
-  // DTO mapping for Outlook meetings
-  const mapOutlookToDto = (outlookMeeting, date) => {
-    return {
-      externalId: outlookMeeting.entry_id, // Stable external ID from Outlook
-      subject: outlookMeeting.subject,    // Outlook uses 'subject' not 'title'
-      start: outlookMeeting.start,         // Outlook uses 'start' not 'startTime'
-      end: outlookMeeting.end,             // Outlook uses 'end' not 'endTime'
-      location: outlookMeeting.location,
-      attendees: outlookMeeting.attendees || [],
-      _date: date, // Internal field for UI
-      // Keep backward compatibility fields for existing UI code
-      title: outlookMeeting.subject,      // Backward compatibility
-      startTime: outlookMeeting.start,     // Backward compatibility
-      endTime: outlookMeeting.end,         // Backward compatibility
-      entry_id: outlookMeeting.entry_id,   // Backward compatibility
-      id: outlookMeeting.entry_id,         // Backward compatibility
-      // DB fields will be added on selection, not during load
-    }
-  }
+  const linkPage = page => runAction(async () => {
+    const row = await ensureMeeting()
+    const response = await invoke('link_page_to_meeting', { meetingId: row.id, pageId: page.id })
+    if (!response.success) throw new Error(response.error || 'Could not link page')
+    setLinkedPages(current => current.some(item => item.id === page.id) ? current : [...current, page])
+    setSelectedPageId(page.id)
+    setPickerOpen(false)
+    const refreshed = await invoke('get_meeting_by_outlook_id', { outlookId: row.outlook_id })
+    if (refreshed.success && refreshed.data) storeMeeting(refreshed.data)
+  })
 
-  // Load meetings from Outlook only (no DB merging)
-  const loadOutlookMeetings = async (date) => {
-    try {
-      const dateStr = date.toISOString().split('T')[0]
-      const meetingsResponse = await invoke('get_outlook_meetings', { date: dateStr })
-      const outlookMeetings = meetingsResponse || []
-      
-      // Map to DTO structure
-      return outlookMeetings.map(meeting => mapOutlookToDto(meeting, date))
-    } catch (error) {
-      console.error(`Error loading Outlook meetings for ${date}:`, error)
-      return []
-    }
-  }
-
-  // Merge strategy: Outlook = authoritative for core fields, DB = authoritative for extended fields
-  const mergeMeetingData = (outlookDto, dbRecord) => {
-    if (!dbRecord) {
-      return outlookDto
-    }
-    
-    // Handle both DTO format and legacy format
-    const externalId = outlookDto.externalId || outlookDto.entry_id || outlookDto.id
-    const subject = outlookDto.subject || outlookDto.title
-    const start = outlookDto.start || outlookDto.startTime
-    const end = outlookDto.end || outlookDto.endTime
-    const location = outlookDto.location
-    const attendees = outlookDto.attendees || []
-    const _date = outlookDto._date || (start ? new Date(start) : new Date())
-    
-    console.log('[mergeMeetingData] Merging with fields:', { externalId, subject, start, end, location, attendees, _date });
-    
-    return {
-      // Core fields from Outlook (authoritative) - handle both formats
-      externalId,
-      subject,
-      start,
-      end,
-      location,
-      attendees,
-      _date,
-      // Keep backward compatibility fields
-      id: externalId,
-      title: subject,
-      startTime: start,
-      endTime: end,
-      entry_id: externalId,
-      
-      // Extended fields from DB (authoritative)
-      db_id: dbRecord.id,
-      db_meeting_url: dbRecord.meeting_url,
-      meeting_type: dbRecord.meeting_type,
-    }
-  }
-
-  // Load meetings with DB data only on selection
-  const loadMeetingsWithDbData = async (date) => {
-    console.log('[loadMeetingsWithDbData] Loading Outlook meetings for date:', date);
-    // Step 1: Load only Outlook meetings (no DB merging during initial load)
-    return await loadOutlookMeetings(date)
-  }
-
-  // Handle meeting selection - merge with DB data when selected
-  const onMeetingSelected = async (meeting) => {
-    console.log('[onMeetingSelected] Meeting selected:', meeting);
-    try {
-      // First set the basic meeting data
-      setSelectedMeeting(meeting);
-      
-      // Then try to load and merge DB data
-      const outlookId = meeting.externalId || meeting.entry_id || meeting.id;
-      console.log('[onMeetingSelected] Looking up DB record for outlookId:', outlookId);
-      
-      if (outlookId) {
-        const dbResponse = await invoke('get_meeting_by_outlook_id', { outlookId: outlookId });
-        console.log('[onMeetingSelected] DB lookup response:', dbResponse);
-        
-        if (dbResponse.success && dbResponse.data) {
-          console.log('[onMeetingSelected] Found DB record, merging data');
-          // Merge DB data with the meeting
-          const mergedMeeting = mergeMeetingData(meeting, dbResponse.data);
-          console.log('[onMeetingSelected] Merged meeting:', mergedMeeting);
-          setSelectedMeeting(mergedMeeting);
-        } else {
-          console.log('[onMeetingSelected] No DB record found for this meeting');
-        }
-      }
-    } catch (error) {
-      console.error('[onMeetingSelected] Error loading meeting data:', error);
-      // Still set the meeting even if DB lookup fails
-      setSelectedMeeting(meeting);
-    }
-  }
-
-  // Handle joining a meeting
-  const handleJoinMeeting = async (meeting) => {
-    console.log('[handleJoinMeeting] Joining meeting:', meeting);
-    const url = getMeetingUrl(meeting);
-    if (url) {
-      console.log('[handleJoinMeeting] Opening URL:', url);
-      window.open(url, '_blank');
-    } else {
-      console.warn('[handleJoinMeeting] No meeting URL available');
-      // Could show a toast/notification here
-    }
-  }
-
-
-  // Partial update logic for user modifications
-  const onUserUpdate = async (externalId, updatedFields) => {
-    console.log('[onUserUpdate] Called with externalId:', externalId, 'updatedFields:', updatedFields);
-    if (!externalId) {
-      console.error('[onUserUpdate] externalId is undefined, cannot update');
-      return false;
-    }
-    try {
-      // Check if record exists in DB
-      console.log('[onUserUpdate] Checking if meeting exists in DB...');
-      const dbResponse = await invoke('get_meeting_by_outlook_id', { outlookId: externalId })
-      console.log('[onUserUpdate] DB response:', dbResponse);
-      
-      if (dbResponse.success && dbResponse.data) {
-        console.log('[onUserUpdate] Meeting exists in DB, id:', dbResponse.data.id);
-        // Update existing record using update_meeting_url for partial updates
-        const updateResponse = await invoke('update_meeting_url', {
-          request: {
-            outlook_id: externalId,
-            meeting_url: updatedFields.meeting_url
-          }
-        })
-        
-        if (updateResponse.success) {
-          console.log('[onUserUpdate] Update successful:', updateResponse.data);
-          // Update local state with new data
-          const updatedMeeting = {
-            ...selectedMeeting,
-            ...updatedFields,
-            db_id: dbResponse.data.id,
-            db_meeting_url: updatedFields.meeting_url || dbResponse.data.meeting_url
-          }
-          
-          setSelectedMeeting(updatedMeeting)
-          setMeetings(prevMeetings => 
-            prevMeetings.map(m => 
-              m.externalId === externalId ? { ...m, ...updatedFields } : m
-            )
-          )
-          return true
-        } else {
-          console.error('[onUserUpdate] Update failed:', updateResponse.error);
-          return false
-        }
-      } else {
-        console.log('[onUserUpdate] Meeting not found in DB');
-        // Create new record if user has provided enrichment fields (meeting_url)
-        const shouldCreate = hasRequiredFields(updatedFields);
-        console.log('[onUserUpdate] Should create new meeting?', shouldCreate, 'fields:', updatedFields);
-        
-        if (shouldCreate) {
-          // Get the full meeting data from the meetings array
-          const outlookMeeting = meetings.find(m => m.externalId === externalId);
-          console.log('[onUserUpdate] Found outlook meeting:', outlookMeeting);
-          
-          if (!outlookMeeting) {
-            console.error('[onUserUpdate] Cannot find meeting in local state for externalId:', externalId);
-            return false;
-          }
-          
-          const meetingData = {
-            outlook_id: externalId,
-            title: outlookMeeting.subject || outlookMeeting.title,
-            date: outlookMeeting.start ? outlookMeeting.start.split('T')[0] : new Date().toISOString().split('T')[0],
-            start_time: outlookMeeting.start || new Date().toISOString(),
-            end_time: outlookMeeting.end || new Date().toISOString(),
-            location: outlookMeeting.location,
-            attendees: outlookMeeting.attendees ? JSON.stringify(outlookMeeting.attendees) : null,
-            meeting_url: updatedFields.meeting_url || null,
-            meeting_type: getMeetingType(outlookMeeting),
-            description: null
-          }
-          
-          console.log('[onUserUpdate] Creating meeting with data:', meetingData);
-          
-          const response = await invoke('create_meeting', { request: meetingData })
-          console.log('[onUserUpdate] Create response:', response);
-          
-          if (response.success) {
-            console.log('[onUserUpdate] Meeting created successfully, id:', response.data.id);
-            // Update local state with new data
-            const updatedMeeting = {
-              ...selectedMeeting,
-              ...updatedFields,
-              db_id: response.data.id,
-              db_meeting_url: updatedFields.meeting_url
-            }
-            
-            setSelectedMeeting(updatedMeeting)
-            setMeetings(prevMeetings => 
-              prevMeetings.map(m => 
-                m.externalId === externalId ? { ...m, ...updatedFields, db_id: response.data.id } : m
-              )
-            )
-            return true
-          } else {
-            console.error('[onUserUpdate] Failed to create meeting:', response.error);
-            return false
-          }
-        } else {
-          console.log('[onUserUpdate] No required fields provided, updating local state only');
-          // No enrichment fields provided, just update local state
-          const updatedMeeting = {
-            ...selectedMeeting,
-            ...updatedFields
-          }
-          
-          setSelectedMeeting(updatedMeeting)
-          setMeetings(prevMeetings => 
-            prevMeetings.map(m => 
-              m.externalId === externalId ? { ...m, ...updatedFields } : m
-            )
-          )
-          return true
-        }
-      }
-    } catch (error) {
-      console.error('[onUserUpdate] Error updating meeting:', error)
-      return false
-    }
-  }
-
-  // Check if user has provided required enrichment fields
-  const hasRequiredFields = (fields) => {
-    // Define what constitutes required enrichment - only URL since project_id is not in DB schema
-    const hasUrl = fields.meeting_url && fields.meeting_url.trim()
-    console.log('🔍 DEBUG: hasRequiredFields check:', { hasUrl, fields })
-    return hasUrl
-  }
-
-  const handleSaveUrl = async () => {
-    if (selectedMeeting && editedUrl.trim()) {
-      const externalId = selectedMeeting.externalId || selectedMeeting.entry_id || selectedMeeting.id;
-      if (!externalId) {
-        console.error('[handleSaveUrl] selectedMeeting has no valid ID:', selectedMeeting);
-        setIsEditingUrl(false);
-        return;
-      }
-      
-      // Use the new partial update logic
-      const success = await onUserUpdate(externalId, {
-        meeting_url: editedUrl.trim()
-      })
-      
-      if (success) {
-        // Also update local meetingUrls state for backward compatibility
-        setMeetingUrls(prev => ({
-          ...prev,
-          [externalId]: editedUrl.trim()
-        }))
-      }
-    }
-    setIsEditingUrl(false)
-  }
-
-  const handleStartEditingUrl = () => {
-    // Use externalId instead of id for the new DTO structure
-    const existingUrl = selectedMeeting?.db_meeting_url || meetingUrls[selectedMeeting?.externalId] || ''
-    setEditedUrl(existingUrl)
-    setIsEditingUrl(true)
-  }
-
-  // Extract URL from location string - looks for http/https URLs
-  const extractUrlFromLocation = (location) => {
-    if (!location) return null
-    const urlRegex = /(https?:\/\/[^\s]+)/i
-    const match = location.match(urlRegex)
-    return match ? match[1] : null
-  }
-
-  const getMeetingUrl = (meeting) => {
-    // First check database URL (from merged data)
-    if (meeting.db_meeting_url) {
-      return meeting.db_meeting_url
-    }
-    
-    // Then check if user has saved a custom URL (backward compatibility)
-    const customUrl = meetingUrls[meeting.externalId]
-    if (customUrl) {
-      return customUrl
-    }
-    
-    // If no custom URL, try to extract from location field
-    const location = meeting.location || ''
-    const urlRegex = /(https?:\/\/[^\s]+)/
-    const match = location.match(urlRegex)
-    return match ? match[1] : null
-  }
-
-  const getMeetingType = (meeting) => {
-    const url = getMeetingUrl(meeting)
-    const location = meeting.location || ''
-    
-    if (url) {
-      if (url.includes('zoom.us') || url.includes('zoom')) {
-        return 'zoom'
-      } else if (url.includes('teams.microsoft.com') || url.includes('teams')) {
-        return 'teams'
-      } else if (url.includes('meet.google.com') || url.includes('google')) {
-        return 'google'
-      }
-    }
-    
-    // Check if it's in-person (has room info but no URL)
-    if (location && !url && (location.includes('Room') || location.includes('BAN') || location.includes('PRAMUK') || location.includes('CAMPUS'))) {
-      return 'in-person'
-    }
-    
-    return 'other'
-  }
-
-  const getMeetingLocationDisplay = (meeting) => {
-    const type = getMeetingType(meeting)
-    const location = meeting.location || ''
-    const url = getMeetingUrl(meeting)
-    
-    switch (type) {
-      case 'zoom':
-        return 'Zoom'
-      case 'teams':
-        return 'Teams'
-      case 'google':
-        return 'Google Meet'
-      case 'in-person':
-        return location
-      case 'other':
-        if (url) {
-          // Extract platform from URL
-          if (url.includes('zoom')) return 'Zoom'
-          if (url.includes('teams')) return 'Teams'
-          if (url.includes('google')) return 'Google Meet'
-          return 'Online'
-        }
-        return location || 'No location'
-      default:
-        return location || 'No location'
-    }
-  }
-
-  const getMultipleLocations = (meeting) => {
-    const location = meeting.location || ''
-    const url = getMeetingUrl(meeting)
-    const locations = []
-    
-    // Split by semicolon and clean up
-    const locationParts = location.split(';').map(part => part.trim()).filter(part => part)
-    
-    // Check each part for URLs or room info
-    locationParts.forEach(part => {
-      if (part.includes('http')) {
-        // It's a URL - determine the platform
-        if (part.includes('zoom.us') || part.includes('zoom')) {
-          locations.push('Zoom')
-        } else if (part.includes('teams.microsoft.com') || part.includes('teams')) {
-          locations.push('Teams')
-        } else if (part.includes('meet.google.com') || part.includes('google')) {
-          locations.push('Google Meet')
-        } else {
-          locations.push('Online')
-        }
-      } else if (part.includes('Room') || part.includes('BAN') || part.includes('PRAMUK') || part.includes('CAMPUS')) {
-        // It's a room location
-        locations.push(part)
-      } else if (part && !part.includes('http')) {
-        // Other location text
-        locations.push(part)
-      }
+  const createAndLinkPage = () => runAction(async () => {
+    const row = await ensureMeeting()
+    const created = await createPage({
+      project_id: row.project_id,
+      area_id: null,
+      title: meeting.subject || 'Meeting page',
+      content: '',
+      page_type: 'meeting',
+      status: 'active',
+      sort_order: 0,
+      meeting_id: null
     })
-    
-    // If no locations found but we have a URL, add it
-    if (locations.length === 0 && url) {
-      if (url.includes('zoom.us') || url.includes('zoom')) {
-        locations.push('Zoom')
-      } else if (url.includes('teams.microsoft.com') || url.includes('teams')) {
-        locations.push('Teams')
-      } else if (url.includes('meet.google.com') || url.includes('google')) {
-        locations.push('Google Meet')
-      } else {
-        locations.push('Online')
-      }
-    }
-    
-    return locations.length > 0 ? locations : ['No location']
-  }
+    if (!created.success || !created.data) throw new Error(created.error || 'Could not create page')
+    const linked = await invoke('link_page_to_meeting', { meetingId: row.id, pageId: created.data.id })
+    if (!linked.success) throw new Error(`Page created, but linking failed: ${linked.error || 'unknown error'}`)
+    setLinkedPages(current => [...current, created.data])
+    setSelectedPageId(created.data.id)
+    setPickerOpen(false)
+  })
 
-  const getLocationTagColor = (location) => {
-    if (location === 'Zoom') return 'bg-gray-100 text-gray-600'
-    if (location === 'Teams') return 'bg-gray-100 text-gray-600'
-    if (location === 'Google Meet') return 'bg-gray-100 text-gray-600'
-    if (location.includes('Room') || location.includes('BAN') || location.includes('PRAMUK') || location.includes('CAMPUS')) {
-      return 'bg-gray-100 text-gray-600'
-    }
-    return 'bg-gray-100 text-gray-600'
-  }
+  const unlinkPage = page => runAction(async () => {
+    const response = await invoke('unlink_page_from_meeting', { meetingId: savedMeeting.id, pageId: page.id })
+    if (!response.success) throw new Error(response.error || 'Could not unlink page')
+    setLinkedPages(current => current.filter(item => item.id !== page.id))
+    if (selectedPageId === page.id) setSelectedPageId(null)
+  })
 
-  const getLocationIcon = (location) => {
-    if (location === 'Zoom' || location === 'Teams' || location === 'Google Meet' || location === 'Online') {
-      return Video
-    }
-    return MapPin
-  }
+  const saveUrl = () => runAction(async () => {
+    const row = await ensureMeeting()
+    const response = await invoke('update_meeting_url', { request: { outlook_id: row.outlook_id, meeting_url: urlDraft.trim() } })
+    if (!response.success) throw new Error(response.error || 'Could not save meeting link')
+    storeMeeting(response.data)
+    setEditingUrl(false)
+  })
 
-  const getMeetingIcon = (meeting) => {
-    const type = getMeetingType(meeting)
-    
-    switch (type) {
-      case 'zoom':
-      case 'teams':
-      case 'google':
-        return Video
-      case 'in-person':
-        return MapPin
-      default:
-        return MapPin
-    }
-  }
+  const startMeetingTracking = () => runAction(async () => {
+    if (!meeting || isCanceled(meeting)) throw new Error('Canceled meetings cannot be tracked')
+    const row = await ensureMeeting()
+    const response = await startActivity({
+      title: meetingTitle(meeting),
+      activity_type: 'meeting',
+      source: 'manual',
+      reference_type: 'meeting',
+      reference_id: row.id,
+      project_id: row.project_id
+    })
+    if (!response.success) throw new Error(response.error || 'Could not start meeting tracking')
+    onActivityStarted?.(response.data, null)
+  })
 
-  const hasLocationUrl = (meeting) => {
-    return !!extractUrlFromLocation(meeting?.location)
-  }
-
-  const handleSaveNotes = () => {
-    if (selectedMeeting) {
-      setMeetingNotes(prev => ({
-        ...prev,
-        [selectedMeeting.id]: currentNotes
-      }))
-      setIsEditingNotes(false)
-    }
-  }
-
-  const formatTime = (timeString) => {
-    if (!timeString) return 'No time'
-    try {
-      const date = new Date(timeString)
-      return date.toLocaleTimeString('en-US', { 
-        hour: 'numeric', 
-        minute: '2-digit',
-        hour12: true 
-      })
-    } catch {
-      return timeString
-    }
-  }
-
-  const calculateDuration = (start, end) => {
-    if (!start || !end) return 'Unknown duration'
-    try {
-      const startDate = new Date(start)
-      const endDate = new Date(end)
-      const diff = endDate - startDate
-      const minutes = Math.floor(diff / 60000)
-      if (minutes < 60) return `${minutes}m`
-      const hours = Math.floor(minutes / 60)
-      const remainingMinutes = minutes % 60
-      return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`
-    } catch {
-      return 'Unknown duration'
-    }
-  }
-
-  // Resolve project details for MeetingView
-  const resolvedProject = selectedMeeting?.externalId && meetingProjects[selectedMeeting.externalId]
-    ? projects.find(p => p.id === meetingProjects[selectedMeeting.externalId])
-    : null;
-
-  const meetingForView = selectedMeeting ? {
-    ...selectedMeeting,
-    project: resolvedProject ? { name: resolvedProject.title } : null,
-  } : null;
-
-  if (showMeetingView && meetingForView) {
-    return (
-      <MeetingView
-        meeting={meetingForView}
-        onClose={() => setShowMeetingView(false)}
-      />
-    );
-  }
+  const stopMeetingTracking = () => runAction(async () => {
+    const response = await stopCurrentActivity()
+    if (!response.success) throw new Error(response.error || 'Could not stop meeting tracking')
+    onActivityStopped?.()
+  })
 
   return (
-    <div className="h-full bg-gray-60 flex gap-4 p-4">
-      {/* Left Main Content */}
-      <div className="w-96 flex flex-col overflow-hidden relative">
-        <div className="h-full flex flex-col">
-          {/* Meeting List - Main Content */}
-          <div className="w-full h-full flex flex-col">
-            {/* Meeting List */}
-            <div className="flex-1 overflow-auto">
-              <div className="w-full h-full rounded-2xl border border-gray-200 bg-white overflow-hidden">
-                <div className="bg-white p-4 border-b border-gray-200">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center w-48 justify-between">
-                      <button
-                        onClick={handlePrevDay}
-                        className="p-1 rounded hover:bg-gray-200 transition-colors"
-                      >
-                        <ChevronLeft className="w-4 h-4 text-gray-600" />
-                      </button>
-                      <span className="text-sm font-medium text-gray-900 text-center flex-1">
-                        {formatDateLabel(selectedDate)}
-                      </span>
-                      <button
-                        onClick={handleNextDay}
-                        className="p-1 rounded hover:bg-gray-200 transition-colors"
-                      >
-                        <ChevronRight className="w-4 h-4 text-gray-600" />
-                      </button>
-                    </div>
-                    <button
-                      onClick={handleToday}
-                      className={`px-4 py-2 rounded-full transition-colors text-sm font-medium ${
-                        selectedDate.toDateString() === new Date().toDateString()
-                          ? 'bg-gray-900 text-white'
-                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                      }`}
-                    >
-                      Today
-                    </button>
-                  </div>
-                </div>
-                <div className="p-4">
-              {loading ? (
-                <div className="flex items-center justify-center h-32">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-                </div>
-              ) : error ? (
-                <div className="text-center py-8">
-                  <p className="text-red-600 mb-2">{error}</p>
-                  <button
-                    onClick={loadMeetings}
-                    className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-                  >
-                    Retry
-                  </button>
-                </div>
-              ) : getCurrentMeetings().length === 0 ? (
-                <div className="text-center py-12">
-                  <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-500">No meetings scheduled</p>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  {/* Today's Meetings */}
-                  {getMeetingsForDate(selectedDate).length > 0 && (
-                    <div className="mb-4">
-                      <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 px-1 flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
-                        {formatDateLabel(selectedDate)}
-                      </div>
-                      <div className="space-y-2">
-                        {getMeetingsForDate(selectedDate).map((meeting) => {
-                          const displayMeeting = convertOutlookMeeting(meeting)
-                          const isSelected = selectedMeeting?.id === displayMeeting.id
-                          const startTime = formatTime(displayMeeting.startTime)
-                          const endTime = formatTime(displayMeeting.endTime)
-                          
-                          return (
-                            <div
-                              key={meeting.externalId || meeting.entry_id}
-                              onClick={() => handleMeetingSelect(displayMeeting)}
-                              className={`
-                                p-3 bg-white rounded-2xl border border-gray-100
-                                hover:border-gray-300 cursor-pointer transition-all duration-200 group
-                                ${isSelected 
-                                  ? 'border-gray-900 bg-gray-100 ring-1 ring-gray-900/20' 
-                                  : 'hover:bg-gray-50'}
-                              `}
-                            >
-                              <div className="flex items-center gap-2">
-                                <h4 className="flex-1 text-sm font-medium text-gray-900 truncate">
-                                  {displayMeeting.title}
-                                </h4>
-                                <button
-                                  onClick={async (e) => {
-                                    e.stopPropagation()
-                                    await handleJoinMeeting(displayMeeting)
-                                  }}
-                                  className="p-1.5 bg-todoist-red text-white rounded-2xl hover:bg-todoist-red-hover transition-all flex-shrink-0 opacity-0 group-hover:opacity-100"
-                                >
-                                  <Video className="w-3 h-3" />
-                                </button>
-                              </div>
-                              <div className="flex items-center justify-start mt-1">
-                                <div className="flex items-center gap-2 text-xs text-gray-500">
-                                  <Clock className="w-3 h-3" />
-                                  <span>{startTime} - {endTime}</span>
-                                </div>
-                              </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Tomorrow's Meetings */}
-                  {(() => {
-                    const tomorrow = new Date(selectedDate)
-                    tomorrow.setDate(selectedDate.getDate() + 1)
-                    return getMeetingsForDate(tomorrow).length > 0 && (
-                      <div className="mb-4">
-                        <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 px-1 flex items-center gap-2">
-                          <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
-                          {formatDateLabel(tomorrow)}
-                        </div>
-                        <div className="space-y-2">
-                          {getMeetingsForDate(tomorrow).map((meeting) => {
-                            const displayMeeting = convertOutlookMeeting(meeting)
-                            const isSelected = selectedMeeting?.id === displayMeeting.id
-                            const startTime = formatTime(displayMeeting.startTime)
-                            const endTime = formatTime(displayMeeting.endTime)
-                            
-                            return (
-                              <div
-                                key={meeting.externalId || meeting.entry_id}
-                                onClick={() => handleMeetingSelect(displayMeeting)}
-                                className={`
-                                  p-3 bg-white rounded-2xl border border-gray-100
-                                  hover:border-gray-300 cursor-pointer transition-all duration-200 group
-                                  ${isSelected 
-                                    ? 'border-gray-900 bg-gray-100 ring-1 ring-gray-900/20' 
-                                    : 'hover:bg-gray-50'}
-                                `}
-                              >
-                                <div className="flex items-center gap-2">
-                                  <h4 className="flex-1 text-sm font-medium text-gray-900 truncate">
-                                    {displayMeeting.title}
-                                  </h4>
-                                  <button
-                                    onClick={async (e) => {
-                                      e.stopPropagation()
-                                      await handleJoinMeeting(displayMeeting)
-                                    }}
-                                    className="p-1.5 bg-todoist-red text-white rounded-2xl hover:bg-todoist-red-hover transition-all flex-shrink-0 opacity-0 group-hover:opacity-100"
-                                  >
-                                    <Video className="w-3 h-3" />
-                                  </button>
-                                </div>
-                                <div className="flex items-center justify-start mt-1">
-                                  <div className="flex items-center gap-2 text-xs text-gray-500">
-                                    <Clock className="w-3 h-3" />
-                                    <span>{startTime} - {endTime}</span>
-                                  </div>
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    )
-                  })()}
-                </div>
-              )}
-                </div>
-              </div>
-            </div>
+    <div className="flex h-full min-h-0 min-w-0 flex-col bg-slate-100 text-slate-900">
+      <div className="relative z-20 flex h-16 flex-none items-center border-b border-slate-200 bg-white">
+        <div className="flex h-16 w-72 flex-none items-center border-r border-slate-200 px-3">
+          <div className="flex h-9 w-full items-center rounded-full border border-slate-200 bg-white">
+            <button type="button" onClick={() => setDate(value => addDays(value, -1))} className="grid h-8 w-8 flex-none place-items-center rounded-full text-slate-500 hover:bg-slate-50" aria-label="Previous day"><ChevronLeft className="h-4 w-4" /></button>
+            <DatePickerField value={date} onChange={next => next && setDate(next)} ariaLabel="Select meeting date" compact className="min-w-0 flex-1 justify-center border-0 bg-transparent px-1 hover:bg-slate-50" />
+            <button type="button" onClick={() => setDate(value => addDays(value, 1))} className="grid h-8 w-8 flex-none place-items-center rounded-full text-slate-500 hover:bg-slate-50" aria-label="Next day"><ChevronRight className="h-4 w-4" /></button>
           </div>
         </div>
-      </div>
-
-      {/* Right: Meeting Details */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="h-full bg-white rounded-2xl border border-gray-200 overflow-hidden flex flex-col">
-          {selectedMeeting ? (
-            <>
-              {/* Header */}
-              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-                {/* Navigation Arrows - Matching meeting list style */}
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={handlePreviousMeeting}
-                    disabled={!canGoPrevious()}
-                    className={`p-1 rounded transition-colors ${
-                      canGoPrevious()
-                        ? 'hover:bg-gray-200 text-gray-600'
-                        : 'text-gray-300 cursor-not-allowed'
-                    }`}
-                    title="Previous meeting"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={handleNextMeeting}
-                    disabled={!canGoNext()}
-                    className={`p-1 rounded transition-colors ${
-                      canGoNext()
-                        ? 'hover:bg-gray-200 text-gray-600'
-                        : 'text-gray-300 cursor-not-allowed'
-                    }`}
-                    title="Next meeting"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-                <div className="flex items-center gap-3">
-                  <button className="p-2 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors">
-                    <Star className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Content */}
-              <div className="flex-1 overflow-y-auto">
-                {/* Meeting Title */}
-                <div className="px-6 py-5 flex items-start justify-between gap-4">
-                  <h2 className="text-2xl font-semibold text-gray-900 flex-1">
-                    {selectedMeeting.title}
-                  </h2>
-                  <div className="flex items-center flex-shrink-0">
-                    {isEditingUrl ? (
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="url"
-                          value={editedUrl}
-                          onChange={(e) => setEditedUrl(e.target.value)}
-                          placeholder="https://teams.microsoft.com/..."
-                          className="w-64 px-3 py-1.5 text-sm border border-gray-200 rounded-lg bg-white text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-900"
-                          autoFocus
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleSaveUrl()
-                            if (e.key === 'Escape') setIsEditingUrl(false)
-                          }}
-                        />
-                        <button
-                          onClick={handleSaveUrl}
-                          className="px-3 py-1 text-sm bg-gray-900 text-white rounded-lg hover:bg-gray-700"
-                        >
-                          Save
-                        </button>
-                        <button
-                          onClick={() => setIsEditingUrl(false)}
-                          className="px-3 py-1 text-sm bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        {getMeetingUrl(selectedMeeting) && (
-                          <a
-                            href={getMeetingUrl(selectedMeeting)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={() => setShowMeetingView(true)}
-                            className="flex items-center gap-2 px-4 py-2 bg-todoist-red hover:bg-todoist-red-hover text-white text-sm font-medium rounded-full transition-colors"
-                          >
-                            <Video className="w-4 h-4" />
-                            Join
-                          </a>
-                        )}
-
-                        <button
-                          onClick={() => setShowMeetingView(true)}
-                          className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-100 text-gray-900 text-sm font-medium rounded-full border border-gray-200 transition-colors"
-                        >
-                          <List className="w-4 h-4" />
-                          Meeting View
-                        </button>
-
-                        {getMeetingUrl(selectedMeeting) ? (
-                          !hasLocationUrl(selectedMeeting) && (
-                            <button
-                              onClick={handleStartEditingUrl}
-                              className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                              title="Edit meeting link"
-                            >
-                              <Edit3 className="w-3.5 h-3.5" />
-                            </button>
-                          )
-                        ) : (
-                          <button
-                            onClick={handleStartEditingUrl}
-                            className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors border border-dashed border-gray-300"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                            Add meeting link
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Properties List */}
-                <div className="px-6 space-y-4">
-                  {/* Meeting Time */}
-                  <div className="flex items-center">
-                    <div className="w-32 flex items-center gap-2 text-sm text-gray-500">
-                      <Clock className="w-4 h-4" />
-                      <span>Time</span>
-                    </div>
-                    <div className="flex-1 flex items-center gap-2">
-                      <span className="text-sm text-gray-700">
-                        {formatTime(selectedMeeting.startTime)} - {formatTime(selectedMeeting.endTime)}
-                      </span>
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 font-medium">
-                        {calculateDuration(selectedMeeting.startTime, selectedMeeting.endTime)}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Meeting Location */}
-                  <div className="flex items-center">
-                    <div className="w-32 flex items-center gap-2 text-sm text-gray-500">
-                      {(() => {
-                        const Icon = getMeetingIcon(selectedMeeting)
-                        return <Icon className="w-4 h-4" />
-                      })()}
-                      <span>Location</span>
-                    </div>
-                    <div className="flex-1 flex items-center gap-2 flex-wrap">
-                      {getMultipleLocations(selectedMeeting).map((location, index) => {
-                        const Icon = getLocationIcon(location)
-                        return (
-                          <span key={index} className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${getLocationTagColor(location)}`}>
-                            <Icon className="w-3 h-3" />
-                            {location}
-                          </span>
-                        )
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Project */}
-                  <div className="flex items-center">
-                    <div className="w-32 flex items-center gap-2 text-sm text-gray-500">
-                      <Briefcase className="w-4 h-4" />
-                      <span>Project</span>
-                    </div>
-                    <div className="flex-1 relative dropdown-container" ref={projectDropdown.ref}>
-                      <button
-                        onClick={() => {
-                          if (!selectedMeeting) {
-                            console.warn('[ProjectDropdown] No meeting selected, cannot assign project');
-                            return;
-                          }
-                          projectDropdown.setIsOpen(!projectDropdown.isOpen);
-                        }}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                          selectedMeeting?.project_id
-                            ? 'bg-gray-100 text-gray-600'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}
-                      >
-                        <span className={`w-1.5 h-1.5 rounded-full ${selectedMeeting?.externalId && meetingProjects[selectedMeeting.externalId] ? 'bg-purple-500' : 'bg-gray-400'}`}></span>
-                        {selectedMeeting?.externalId && meetingProjects[selectedMeeting.externalId] && projects.find(p => p.id === meetingProjects[selectedMeeting.externalId])
-                          ? projects.find(p => p.id === meetingProjects[selectedMeeting.externalId])?.title
-                          : 'No Project'}
-                      </button>
-                      {projectDropdown.isOpen && selectedMeeting && (
-                        <div className="absolute top-full left-0 mt-2 bg-white rounded-xl shadow-2xl border border-gray-200 z-20 py-2 min-w-[200px] overflow-hidden">
-                          <button
-                            onClick={() => handleProjectSelect(null)}
-                            className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 ${
-                              !selectedMeeting?.externalId || !meetingProjects[selectedMeeting.externalId] ? 'bg-gray-200 text-gray-900' : 'text-gray-700'
-                            }`}
-                          >
-                            No Project
-                          </button>
-                          {projects.map(project => (
-                            <button
-                              key={project.id}
-                              onClick={() => handleProjectSelect(project.id)}
-                              className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 ${
-                                selectedMeeting?.externalId && meetingProjects[selectedMeeting.externalId] === project.id ? 'bg-gray-200 text-gray-900' : 'text-gray-700'
-                              }`}
-                            >
-                              {project.title}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                </div>
-
-                {/* Tabs */}
-                <div className="flex border-b border-gray-200 mt-6 px-6">
-                  {['Notes', 'Attachments'].map((tab, index) => (
-                    <button
-                      key={tab}
-                      onClick={() => setActiveTab(tab.toLowerCase())}
-                      className={`px-4 py-3 text-sm font-medium transition-colors ${
-                        activeTab === tab.toLowerCase()
-                          ? 'text-gray-900 border-b-2 border-gray-900'
-                          : 'text-gray-500 hover:text-gray-700'
-                      } ${index === 0 ? 'pl-0' : ''}`}
-                    >
-                      {tab}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Tab Content */}
-                <div className="px-6 py-4">
-                  {activeTab === 'notes' && (
-                    <div className="bg-gray-50 rounded-xl p-4">
-                      <h3 className="text-sm font-semibold text-gray-900 mb-3">
-                        Meeting Notes
-                      </h3>
-                      <div className="min-h-[120px]">
-                        {currentNotes ? (
-                          <div className="whitespace-pre-wrap text-sm text-gray-600">
-                            {currentNotes}
-                          </div>
-                        ) : (
-                          <div className="text-sm text-gray-400 italic">
-                            No notes added to this meeting.
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  {activeTab === 'attachments' && (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm text-gray-500">No attachments yet</span>
-                        <button className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-                          <Paperclip className="w-4 h-4" />
-                          Add attachment
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="h-full flex flex-col items-center justify-center text-gray-400">
-              <Calendar className="w-20 h-20 mb-4 opacity-50" />
-              <p className="text-lg font-medium">Select a meeting</p>
+        <div className="flex min-w-0 flex-1 items-center justify-between gap-4 px-5">
+          {meeting && <>
+            <div className="flex min-w-0 items-center gap-2"><h1 className="min-w-0 truncate text-lg font-semibold tracking-tight" title={meetingTitle(meeting)}>{meetingTitle(meeting)}</h1>{isCanceled(meeting) && <span className="flex-none rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-500">Canceled</span>}</div>
+            <div className="flex flex-none items-center gap-2">
+              <div className="relative w-44 flex-none"><FolderKanban className="pointer-events-none absolute left-3 top-2.5 z-10 h-4 w-4 text-indigo-600" /><Select value={selectedProjectId ?? ''} disabled={busy || !outlookId} onChange={value => changeProject(value ? Number(value) : null)} options={[{ value: '', label: 'No project' }, ...projects.map(project => ({ value: project.id, label: project.title }))]} ariaLabel="Meeting project" triggerClassName="border-indigo-200 bg-indigo-50 pl-9 font-semibold text-indigo-800 hover:border-indigo-300 hover:bg-indigo-100" menuClassName="right-0 left-auto w-56" /></div>
+              {meetingUrl && !isCanceled(meeting) && <a href={meetingUrl} target="_blank" rel="noopener noreferrer" className="inline-flex h-9 items-center justify-center gap-2 rounded-full border border-indigo-600 bg-indigo-600 px-4 text-sm font-semibold text-white transition-colors duration-200 hover:border-indigo-700 hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"><Video className="h-4 w-4" /> Join</a>}
+              {!isCanceled(meeting) && (isTrackingMeeting ? <button type="button" onClick={stopMeetingTracking} disabled={busy} className="inline-flex h-9 items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-3 text-sm font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-50"><Square className="h-3.5 w-3.5" /> Stop tracking</button> : <button type="button" onClick={startMeetingTracking} disabled={busy || !outlookId} className="inline-flex h-9 items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"><Play className="h-4 w-4" />{runningActivity ? 'Switch to meeting' : 'Track meeting'}</button>)}
+              <div className="relative"><button type="button" onClick={() => { setUrlDraft(savedMeeting?.meeting_url || meetingUrl || ''); setEditingUrl(true) }} className={`inline-flex h-9 items-center justify-center gap-1.5 rounded-full border border-slate-200 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50 ${meetingUrl ? 'w-9' : 'px-3'}`} title={meetingUrl ? 'Edit meeting link' : 'Add meeting link'} aria-label={meetingUrl ? 'Edit meeting link' : 'Add meeting link'}><Link2 className="h-4 w-4" />{!meetingUrl && 'Add link'}</button>
+                {editingUrl && <div className="absolute right-0 top-11 z-40 flex w-80 gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-xl"><input value={urlDraft} onChange={event => setUrlDraft(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') saveUrl(); if (event.key === 'Escape') setEditingUrl(false) }} placeholder="https://…" className="h-9 min-w-0 flex-1 rounded-full border border-slate-200 px-3 text-xs outline-none focus:border-indigo-400" autoFocus /><button onClick={saveUrl} disabled={busy || !urlDraft.trim()} className="grid h-9 w-9 flex-none place-items-center rounded-full bg-indigo-600 text-white disabled:opacity-50" aria-label="Save meeting link"><Check className="h-4 w-4" /></button><button onClick={() => setEditingUrl(false)} className="grid h-9 w-9 flex-none place-items-center rounded-full border border-slate-200" aria-label="Cancel"><X className="h-4 w-4" /></button></div>}</div>
             </div>
-          )}
+          </>}
         </div>
       </div>
 
+      {loading ? <div className="flex flex-1 items-center justify-center text-sm text-slate-500">Loading Outlook meetings…</div>
+        : error ? <div className="flex flex-1 flex-col items-center justify-center gap-3 text-sm text-slate-600"><p>{error}</p><button onClick={() => setReloadKey(value => value + 1)} className="rounded-full bg-indigo-600 px-4 py-2 font-semibold text-white">Retry</button></div>
+          : <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[288px_minmax(0,1fr)]">
+              <aside className="min-h-0 overflow-y-auto border-b border-slate-200 bg-white lg:border-b-0 lg:border-r" aria-label="Meetings for selected day">
+                <div className="flex h-16 items-center justify-between gap-2 border-b border-slate-200 px-3"><span className="flex-none rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600">{meetings.length} meetings</span><div className="flex flex-none items-center gap-1"><button type="button" onClick={() => setDate(localDate(new Date()))} className="h-8 rounded-full border border-slate-200 px-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50">Today</button><button type="button" onClick={() => setReloadKey(value => value + 1)} className="grid h-8 w-8 place-items-center rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50" title="Refresh meetings" aria-label="Refresh meetings"><RefreshCw className="h-4 w-4" /></button></div></div>
+                {meetings.length ? <div className="divide-y divide-slate-100">{meetings.map((item, index) => {
+                  const itemProject = projects.find(project => String(project.id) === String(savedMeetings[item.entry_id]?.project_id))
+                  const itemIsRunning = runningActivity?.reference_type === 'meeting' && runningActivity.reference_id === savedMeetings[item.entry_id]?.id
+                  return <button key={`${meetingKey(item)}-${index}`} type="button" onClick={() => { setSelectedIndex(index); setActionError(''); setEditingUrl(false) }} aria-current={selectedIndex === index ? 'true' : undefined} className={`relative flex w-full flex-col gap-1 px-4 py-3 text-left transition-colors ${selectedIndex === index ? 'bg-indigo-50/70' : 'hover:bg-slate-50'} ${isCanceled(item) ? 'opacity-65' : ''}`}>
+                    {selectedIndex === index && <span className="absolute inset-y-0 left-0 w-0.5 bg-indigo-500" />}
+                    <span className="flex w-full items-start gap-2"><span className={`min-w-0 flex-1 line-clamp-2 text-sm font-semibold leading-snug ${selectedIndex === index ? 'text-indigo-800' : 'text-slate-800'}`}>{meetingTitle(item)}</span>{itemIsRunning && <span className="mt-1 h-2 w-2 flex-none animate-pulse rounded-full bg-emerald-500" title="Tracking" />}{isCanceled(item) && <span className="flex-none rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">Canceled</span>}</span>
+                    <span className="flex w-full items-center gap-2 text-xs text-slate-500"><span className="flex-none tabular-nums">{timeLabel(item.start)} – {timeLabel(item.end)}</span>{itemProject && <span className="ml-auto max-w-28 truncate rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-600" title={itemProject.title}>{itemProject.title}</span>}</span>
+                  </button>
+                })}</div> : <p className="px-4 py-8 text-center text-sm text-slate-500">No meetings on this day.</p>}
+              </aside>
+              <div className="flex min-h-0 min-w-0 flex-col">
+              {!meeting ? <div className="flex flex-1 flex-col items-center justify-center text-slate-500"><CalendarDays className="mb-3 h-7 w-7 text-slate-300" /><p className="text-sm font-medium">No meetings on {dateLabel(date)}</p><p className="mt-1 text-xs">Choose another day to browse Outlook.</p></div> : <>
+              <div className="flex h-16 flex-none items-center gap-8 border-b border-slate-200 bg-white px-5 text-sm font-medium text-slate-700"><span className="inline-flex flex-none items-center gap-2"><Clock3 className="h-4 w-4 text-indigo-600" />{timeLabel(meeting.start)} – {timeLabel(meeting.end)}</span><span className="inline-flex min-w-0 items-center gap-2"><MapPin className="h-4 w-4 flex-none text-indigo-600" /><span className="truncate" title={meeting.location || ''}>{meeting.location || 'No location'}</span></span></div>
+              {actionError && <p role="alert" className="mx-5 mt-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">{actionError}</p>}
+              {!outlookId && <p className="mx-5 mt-2 text-xs text-amber-700">Outlook did not provide an event ID. Project and page links cannot be saved for this meeting.</p>}
+              <section className="flex min-h-0 min-w-0 flex-1 flex-col bg-slate-100">
+                <div className="relative z-10 flex min-h-12 flex-none flex-wrap items-center gap-x-4 gap-y-2 border-b border-slate-200 bg-white px-5 py-2">
+                  <div className="flex min-w-0 items-center gap-2"><span className="inline-flex h-7 flex-none items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 text-xs font-semibold text-indigo-700"><FileText className="h-3.5 w-3.5" />Page</span>{linkedPages.length > 1 ? <Select value={selectedPage?.id || ''} onChange={value => setSelectedPageId(Number(value))} options={linkedPages.map(page => ({ value: page.id, label: page.title }))} ariaLabel="Linked page" className="w-56" triggerClassName="h-8 text-xs font-semibold" /> : <h2 className="max-w-56 truncate text-sm font-semibold" title={selectedPage?.title}>{selectedPage?.title || 'Linked page'}</h2>}{linkedPages.length > 1 && <span className="text-[11px] text-slate-400">{linkedPages.length} pages</span>}</div>
+                  <div className="ml-auto flex items-center gap-2">{selectedPage && <><button onClick={() => onOpenPage?.(selectedPage)} className="inline-flex h-8 items-center gap-1 rounded-full border border-indigo-200 px-3 text-xs font-semibold text-indigo-700 hover:bg-indigo-50">Open in Pages <ArrowRight className="h-3.5 w-3.5" /></button><button onClick={() => unlinkPage(selectedPage)} disabled={busy} className="grid h-8 w-8 place-items-center rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-rose-600" title="Unlink page (does not delete it)" aria-label="Unlink page"><Unlink2 className="h-3.5 w-3.5" /></button></>}<button onClick={createAndLinkPage} disabled={busy || !outlookId} className="inline-flex h-8 items-center gap-1 rounded-full border border-slate-200 px-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"><Plus className="h-3.5 w-3.5" /> New</button><div className="relative"><button onClick={() => setPickerOpen(value => !value)} disabled={busy || !outlookId} className="inline-flex h-8 items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50"><Link2 className="h-3.5 w-3.5" /> Link page</button>{pickerOpen && <div className="absolute right-0 top-10 z-30 w-72 rounded-xl border border-slate-200 bg-white p-2 shadow-xl"><input value={pageSearch} onChange={event => setPageSearch(event.target.value)} placeholder="Search pages" autoFocus className="h-9 w-full rounded-full border border-slate-200 px-3 text-sm outline-none focus:border-indigo-400" /><div className="mt-2 max-h-64 overflow-y-auto">{pagesLoading ? <p className="p-3 text-xs text-slate-500">Loading pages…</p> : availablePages.length ? availablePages.map(page => <button key={page.id} onClick={() => linkPage(page)} className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-indigo-50"><span className="min-w-0 truncate">{page.title}</span><span className="flex-none text-[11px] text-slate-500">{projects.find(project => project.id === page.project_id)?.title || 'No project'}</span></button>) : <p className="p-3 text-xs text-slate-500">No matching pages</p>}</div></div>}</div></div>
+                </div>
+                {selectedPage && <div ref={tabRailRef} className="relative flex h-12 flex-none items-end gap-1 border-b border-slate-200 bg-white px-5" role="tablist" aria-label="Linked page views"><span aria-hidden="true" className={`pointer-events-none absolute bottom-0 h-0.5 rounded-full bg-indigo-500 transition-[left,width] duration-300 ease-out motion-reduce:transition-none ${tabIndicator.visible ? 'opacity-100' : 'opacity-0'}`} style={{ left: tabIndicator.left, width: tabIndicator.width }} />{[["content", "Content", FileText, null], ["tasks", "Tasks", ListTodo, pageTaskIds.length], ["updates", "Page updates", MessageSquareText, pageUpdates.length]].map(([value, label, Icon, count]) => <button key={value} ref={element => { if (element) tabRefs.current.set(value, element); else tabRefs.current.delete(value) }} type="button" role="tab" aria-selected={pageView === value} onClick={() => setPageView(value)} className={`relative z-10 inline-flex h-12 items-center gap-2 px-3 text-sm font-medium transition-colors duration-300 ${pageView === value ? 'text-indigo-700' : 'text-slate-700 hover:text-slate-900'}`}><Icon className="h-4 w-4" />{label}{count != null && <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold transition-colors duration-300 ${pageView === value ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-700'}`}>{count}</span>}</button>)}</div>}
+                {selectedPage ? (
+                  <div className="min-h-0 flex-1 overflow-y-auto bg-slate-100 p-3">
+                    <div className="mx-auto flex min-h-[calc(100%-1.5rem)] max-w-5xl flex-col overflow-hidden rounded-xl border border-slate-200 bg-[#fffefa]">
+                      {pageView === 'content' ? <div className="min-h-72 flex-1"><TipTapEditor key={selectedPage.id} content={selectedPage.content} editable={false} showToolbar={false} onChange={() => {}} /></div>
+                        : pageView === 'tasks' ? <div className="divide-y divide-slate-100 bg-white">{pageTasks.length ? pageTasks.map(task => <div key={task.id} className="flex items-center gap-3 px-5 py-3 text-sm"><span className={`h-4 w-4 flex-none rounded-full border ${task.status === 'completed' ? 'border-emerald-500 bg-emerald-500' : 'border-slate-400'}`} /><span className={`min-w-0 flex-1 truncate ${task.status === 'completed' ? 'text-slate-400 line-through' : 'text-slate-800'}`}>{task.title}</span><span className="text-xs capitalize text-slate-500">{task.status.replace('_', ' ')}</span></div>) : <p className="px-5 py-8 text-center text-sm text-slate-500">No tasks linked to this page yet.</p>}</div>
+                          : <div className="space-y-3 bg-slate-50/50 p-5">{pageUpdates.length ? pageUpdates.map(update => <article key={update.id} className="rounded-xl border border-slate-200 bg-white px-4 py-3"><p className="mb-2 text-xs font-semibold text-slate-600">Page update · {update.update_date}</p><div className="prose prose-sm max-w-none break-words [&_img]:!h-auto [&_img]:!w-auto [&_img]:max-h-72 [&_img]:max-w-full [&_img]:cursor-zoom-in [&_img]:object-contain" onClick={event => { if (event.target instanceof HTMLImageElement) setImagePreview({ src: event.target.src, alt: event.target.alt || 'Update image' }) }} dangerouslySetInnerHTML={{ __html: sanitizeUpdateHtml(update.content) }} /></article>) : <p className="py-6 text-center text-sm text-slate-500">No updates on this page yet.</p>}</div>}
+                    </div>
+                  </div>
+                )
+                  : <div className="flex flex-1 flex-col items-center justify-center px-5 text-center"><FileText className="mb-3 h-7 w-7 text-slate-300" /><p className="text-sm font-semibold text-slate-700">No page linked to this meeting</p><p className="mt-1 max-w-sm text-xs text-slate-500">Link an existing project page or create a meeting page. The page holds the discussion, updates, and follow-up tasks.</p></div>}
+              </section>
+              </>}
+              </div>
+            </div>}
+      {imagePreview && <div role="dialog" aria-modal="true" aria-label="Update image preview" className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 p-6" onClick={() => setImagePreview(null)}><button type="button" onClick={() => setImagePreview(null)} className="absolute right-5 top-5 grid h-9 w-9 place-items-center rounded-full bg-white/15 text-white hover:bg-white/25" aria-label="Close image preview"><X className="h-5 w-5" /></button><img src={imagePreview.src} alt={imagePreview.alt} className="max-h-[88vh] max-w-[90vw] object-contain" onClick={event => event.stopPropagation()} /></div>}
     </div>
   )
 }

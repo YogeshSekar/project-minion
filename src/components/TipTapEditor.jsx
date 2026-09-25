@@ -16,7 +16,10 @@ import {
   Underline as UnderlineIcon, 
   Strikethrough, 
   Highlighter, 
+  ImagePlus,
   Link as LinkIcon,
+  Pin,
+  FileText,
   Undo2,
   Redo2,
   List,
@@ -178,7 +181,7 @@ const ResizableImage = Node.create({
   },
 })
 
-function TipTapEditor({ content, onChange, editable = true, moveCursorToEnd = false, onSave, showToolbar = true, hideScrollbar = false }) {
+function TipTapEditor({ content, onChange, editable = true, moveCursorToEnd = false, onSave, showToolbar = true, hideScrollbar = false, compact = false, maxImageBytes, onImageError, onPinSelection, pinnedItems = [], onUnpin, pinBusy = false, pageLinkOptions = [], onPinPageLink, onOpenPageLink }) {
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -244,6 +247,11 @@ function TipTapEditor({ content, onChange, editable = true, moveCursorToEnd = fa
   
   const [isTableDropdownOpen, setIsTableDropdownOpen] = useState(false)
   const tableDropdownRef = useRef(null)
+  const [pageLinkOpen, setPageLinkOpen] = useState(false)
+  const [pageLinkSearch, setPageLinkSearch] = useState('')
+  const [pinNewPageLink, setPinNewPageLink] = useState(false)
+  const pageLinkRef = useRef(null)
+  const pageLinkSelectionRef = useRef(null)
 
   // Close dropdowns on click outside
   useEffect(() => {
@@ -253,6 +261,9 @@ function TipTapEditor({ content, onChange, editable = true, moveCursorToEnd = fa
       }
       if (tableDropdownRef.current && !tableDropdownRef.current.contains(event.target)) {
         setIsTableDropdownOpen(false)
+      }
+      if (pageLinkRef.current && !pageLinkRef.current.contains(event.target)) {
+        setPageLinkOpen(false)
       }
     }
     document.addEventListener('mousedown', handleClickOutside)
@@ -269,10 +280,6 @@ function TipTapEditor({ content, onChange, editable = true, moveCursorToEnd = fa
     return 'Normal Text'
   }
 
-  if (!editor) {
-    return null
-  }
-  
   // Handle file drop/paste
   const handleDrop = useCallback((e) => {
     e.preventDefault()
@@ -280,6 +287,10 @@ function TipTapEditor({ content, onChange, editable = true, moveCursorToEnd = fa
     if (files) {
       Array.from(files).forEach(file => {
         if (file.type.startsWith('image/')) {
+          if (maxImageBytes && file.size > maxImageBytes) {
+            onImageError?.('Image is too large. Choose one under 5 MB.')
+            return
+          }
           const reader = new FileReader()
           reader.onload = (event) => {
             const base64 = event.target?.result
@@ -294,7 +305,7 @@ function TipTapEditor({ content, onChange, editable = true, moveCursorToEnd = fa
         }
       })
     }
-  }, [editor])
+  }, [editor, maxImageBytes, onImageError])
   
   const handlePaste = useCallback((e) => {
     const items = e.clipboardData?.items
@@ -305,6 +316,10 @@ function TipTapEditor({ content, onChange, editable = true, moveCursorToEnd = fa
         e.preventDefault()
         const blob = item.getAsFile()
         if (blob) {
+          if (maxImageBytes && blob.size > maxImageBytes) {
+            onImageError?.('Image is too large. Choose one under 5 MB.')
+            return
+          }
           const reader = new FileReader()
           reader.onload = (event) => {
             const base64 = event.target?.result
@@ -320,7 +335,7 @@ function TipTapEditor({ content, onChange, editable = true, moveCursorToEnd = fa
         return
       }
     }
-  }, [editor])
+  }, [editor, maxImageBytes, onImageError])
   
   // Add image from file picker
   const handleFileSelect = () => {
@@ -332,6 +347,10 @@ function TipTapEditor({ content, onChange, editable = true, moveCursorToEnd = fa
       const files = e.target?.files
       if (files) {
         Array.from(files).forEach(file => {
+          if (maxImageBytes && file.size > maxImageBytes) {
+            onImageError?.('Image is too large. Choose one under 5 MB.')
+            return
+          }
           const reader = new FileReader()
           reader.onload = (event) => {
             const base64 = event.target?.result
@@ -349,10 +368,63 @@ function TipTapEditor({ content, onChange, editable = true, moveCursorToEnd = fa
     input.click()
   }
 
+  const handleCompactLink = () => {
+    const entered = window.prompt('Paste a link URL', editor.getAttributes('link').href || '')
+    if (entered === null) return
+    if (!entered.trim()) {
+      editor.chain().focus().unsetLink().run()
+      return
+    }
+    const url = /^[a-z]+:/i.test(entered.trim()) ? entered.trim() : `https://${entered.trim()}`
+    try {
+      if (!['http:', 'https:'].includes(new URL(url).protocol)) throw new Error('Invalid link')
+    } catch {
+      window.alert('Enter a valid http or https link.')
+      return
+    }
+    if (editor.state.selection.empty) {
+      editor.chain().focus().insertContent({ type: 'text', text: url, marks: [{ type: 'link', attrs: { href: url } }] }).run()
+    } else {
+      editor.chain().focus().setLink({ href: url }).run()
+    }
+  }
+
+  const handlePinSelection = () => {
+    const { from, to, empty } = editor.state.selection
+    const text = empty ? '' : editor.state.doc.textBetween(from, to, ' ').trim()
+    if (!text) {
+      window.alert('Select text in the page content to pin it.')
+      return
+    }
+    onPinSelection?.(text)
+  }
+
+  const openPageLinkPicker = () => {
+    const { from, to } = editor.state.selection
+    pageLinkSelectionRef.current = { from, to }
+    setPageLinkSearch('')
+    setPinNewPageLink(false)
+    setPageLinkOpen(value => !value)
+  }
+
+  const insertPageLink = page => {
+    const { from, to } = pageLinkSelectionRef.current || editor.state.selection
+    const href = `https://project-minion.local/page/${page.id}`
+    if (from !== to) {
+      editor.chain().focus().setTextSelection({ from, to }).setLink({ href }).run()
+    } else {
+      editor.chain().focus().insertContentAt(from, { type: 'text', text: page.title, marks: [{ type: 'link', attrs: { href } }] }).run()
+    }
+    if (pinNewPageLink) onPinPageLink?.(page)
+    setPageLinkOpen(false)
+  }
+
+  if (!editor) return null
+
   return (
-    <div className="h-full flex flex-col">
+    <div className={compact ? 'flex flex-col' : 'h-full flex flex-col'}>
       {/* Toolbar */}
-      {showToolbar && (
+      {showToolbar && !compact && (
         <div className="flex-none px-4 py-2 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700 flex items-center gap-1 flex-wrap">
         {/* History Controls */}
         <button
@@ -583,14 +655,9 @@ function TipTapEditor({ content, onChange, editable = true, moveCursorToEnd = fa
 
         <div className="w-px h-5 bg-gray-300 dark:bg-gray-600 mx-1" />
 
-        {/* Link */}
+        {/* Links and pinned excerpts */}
         <button
-          onClick={() => {
-            const url = window.prompt('Enter URL:')
-            if (url) {
-              editor.chain().focus().setLink({ href: url }).run()
-            }
-          }}
+          onClick={handleCompactLink}
           className={`p-1.5 rounded transition-colors ${
             editor.isActive('link')
               ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300'
@@ -600,6 +667,18 @@ function TipTapEditor({ content, onChange, editable = true, moveCursorToEnd = fa
         >
           <LinkIcon className="w-4 h-4" />
         </button>
+        {onPinSelection && <button type="button" onClick={handlePinSelection} className="rounded p-1.5 text-gray-700 transition-colors hover:bg-gray-200" title="Pin selected text"><Pin className="h-4 w-4" /></button>}
+        {pageLinkOptions.length > 0 && <div className="relative" ref={pageLinkRef}>
+          <button type="button" onClick={openPageLinkPicker} className="inline-flex items-center gap-1 rounded px-2 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-200" title="Link another page"><FileText className="h-4 w-4" /> Link page</button>
+          {pageLinkOpen && <div className="absolute left-0 top-full z-50 mt-1 w-72 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
+            <input autoFocus value={pageLinkSearch} onChange={event => setPageLinkSearch(event.target.value)} placeholder="Search pages" className="h-8 w-full rounded-lg border border-slate-200 px-2.5 text-xs outline-none focus:border-indigo-400" />
+            <div className="no-scrollbar mt-1 max-h-48 overflow-y-auto">
+              {pageLinkOptions.filter(page => page.title.toLowerCase().includes(pageLinkSearch.toLowerCase())).slice(0, 20).map(page => <button key={page.id} type="button" onClick={() => insertPageLink(page)} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-xs text-slate-700 hover:bg-indigo-50 hover:text-indigo-700"><FileText className="h-3.5 w-3.5 flex-none" /><span className="truncate">{page.title}</span></button>)}
+              {!pageLinkOptions.some(page => page.title.toLowerCase().includes(pageLinkSearch.toLowerCase())) && <p className="px-2 py-3 text-xs text-slate-500">No matching pages</p>}
+            </div>
+            <label className="mt-1 flex cursor-pointer items-center gap-2 border-t border-slate-100 px-2 pt-2 text-xs text-slate-600"><input type="checkbox" checked={pinNewPageLink} onChange={event => setPinNewPageLink(event.target.checked)} className="accent-indigo-600" /> Pin this page link</label>
+          </div>}
+        </div>}
 
         {/* Image - File Upload */}
         <button
@@ -766,9 +845,24 @@ function TipTapEditor({ content, onChange, editable = true, moveCursorToEnd = fa
       </div>
       )}
 
+      {!compact && pinnedItems.length > 0 && (
+        <div className="no-scrollbar mx-6 mt-4 mb-1 max-h-36 flex-none space-y-2 overflow-y-auto" aria-label="Pinned page content">
+          {pinnedItems.map(item => (
+            <div key={item.id} className="group flex items-start gap-2 rounded-r-lg border-l-2 border-indigo-400 bg-indigo-50/60 px-3 py-2 text-sm text-slate-700">
+              <Pin className="mt-0.5 h-3.5 w-3.5 flex-none text-indigo-500" aria-hidden="true" />
+              {item.kind === 'page' ? (
+                <button type="button" onClick={() => onOpenPageLink?.(item.linked_page_id)} className="min-w-0 flex-1 text-left font-medium text-indigo-700 hover:underline">{item.displayText}</button>
+              ) : (
+                <span className="min-w-0 flex-1 whitespace-pre-wrap break-words">{item.displayText}</span>
+              )}
+              <button type="button" onClick={() => onUnpin?.(item)} disabled={pinBusy} className="grid h-5 w-5 flex-none place-items-center rounded text-slate-400 opacity-60 hover:bg-indigo-100 hover:text-slate-700 hover:opacity-100 focus-visible:opacity-100 disabled:opacity-30" title="Unpin" aria-label={`Unpin ${item.displayText}`}><span aria-hidden="true">×</span></button>
+            </div>
+          ))}
+        </div>
+      )}
       {/* Editor */}
-      <div 
-        className="flex-1 overflow-y-auto relative"
+      <div
+        className={compact ? 'relative max-h-52 overflow-y-auto' : 'relative flex-1 overflow-y-auto'}
         style={hideScrollbar ? {
           scrollbarWidth: 'none',
           msOverflowStyle: 'none'
@@ -846,14 +940,7 @@ function TipTapEditor({ content, onChange, editable = true, moveCursorToEnd = fa
               <Highlighter className="w-4 h-4" />
             </button>
             <button
-              onClick={() => {
-                const url = window.prompt('Enter URL:')
-                if (url) {
-                  editor.chain().focus().setLink({ href: url }).run()
-                } else if (url === '') {
-                  editor.chain().focus().unsetLink().run()
-                }
-              }}
+              onClick={handleCompactLink}
               className={`p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors ${
                 editor.isActive('link')
                   ? 'text-blue-600 dark:text-blue-400 bg-gray-100 dark:bg-gray-700'
@@ -865,9 +952,18 @@ function TipTapEditor({ content, onChange, editable = true, moveCursorToEnd = fa
             </button>
           </BubbleMenu>
         )}
+        {compact && !content?.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim() && !/<img\b/i.test(content || '') && <span className="pointer-events-none absolute left-4 top-3 text-sm text-slate-400">Write an update…</span>}
         <EditorContent
           editor={editor}
-          className="prose prose-sm dark:prose-invert max-w-none p-6 focus:outline-none min-h-[200px] h-full
+          onClickCapture={event => {
+            const link = event.target.closest?.('a[href]')
+            const match = link?.getAttribute('href')?.match(/^https:\/\/project-minion\.local\/page\/(\d+)$/)
+            if (match && onOpenPageLink) {
+              event.preventDefault()
+              onOpenPageLink(Number(match[1]))
+            }
+          }}
+          className={compact ? 'prose prose-sm max-w-none px-4 py-2.5 text-slate-800 [&_.ProseMirror]:min-h-[28px] [&_.ProseMirror]:outline-none [&_.ProseMirror_p]:my-0.5 [&_.ProseMirror_a]:text-indigo-600 [&_.ProseMirror_a]:underline [&_.ProseMirror_img]:max-w-full [&_.ProseMirror_img]:rounded-lg' : `prose prose-sm dark:prose-invert max-w-none p-6 focus:outline-none min-h-[200px] h-full
             prose-p:my-3 prose-p:leading-relaxed prose-p:text-gray-800 prose-p:dark:text-gray-200
             prose-headings:my-4 prose-headings:font-semibold prose-headings:text-gray-900 prose-headings:dark:text-gray-100 prose-headings:tracking-tight
             prose-h1:text-3xl prose-h1:font-bold prose-h1:mb-4 prose-h1:pb-2 prose-h1:border-b prose-h1:border-gray-200
@@ -897,7 +993,7 @@ function TipTapEditor({ content, onChange, editable = true, moveCursorToEnd = fa
             [&_.resize-handle-sw]:bottom-[-6px] [&_.resize-handle-sw]:left-[-6px] [&_.resize-handle-sw]:cursor-sw-resize
             [&_.resize-handle-ne]:top-[-6px] [&_.resize-handle-ne]:right-[-6px] [&_.resize-handle-ne]:cursor-ne-resize
             [&_.resize-handle-nw]:top-[-6px] [&_.resize-handle-nw]:left-[-6px] [&_.resize-handle-nw]:cursor-nw-resize
-            [&_mark]:bg-yellow-200 [&_mark]:dark:bg-yellow-800/50 [&_mark]:rounded [&_mark]:px-0.5"
+            [&_mark]:bg-yellow-200 [&_mark]:dark:bg-yellow-800/50 [&_mark]:rounded [&_mark]:px-0.5`}
         />
         {/* Drop zone indicator */}
         <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-0 transition-opacity">
@@ -906,6 +1002,15 @@ function TipTapEditor({ content, onChange, editable = true, moveCursorToEnd = fa
           </div>
         </div>
       </div>
+      {showToolbar && compact && (
+        <div className="flex flex-none items-center gap-1 border-t border-slate-200 px-2 py-1.5">
+          <button type="button" onClick={() => editor.chain().focus().toggleBold().run()} className={`grid h-7 w-7 place-items-center rounded-md transition-colors ${editor.isActive('bold') ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500 hover:bg-slate-100'}`} title="Bold" aria-label="Bold"><Bold className="h-4 w-4" /></button>
+          <button type="button" onClick={() => editor.chain().focus().toggleItalic().run()} className={`grid h-7 w-7 place-items-center rounded-md transition-colors ${editor.isActive('italic') ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500 hover:bg-slate-100'}`} title="Italic" aria-label="Italic"><Italic className="h-4 w-4" /></button>
+          <button type="button" onClick={handleCompactLink} className="grid h-7 w-7 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-indigo-700" title="Add link" aria-label="Add link"><LinkIcon className="h-4 w-4" /></button>
+          <button type="button" onClick={handleFileSelect} className="grid h-7 w-7 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-indigo-700" title="Add image" aria-label="Add image"><ImagePlus className="h-4 w-4" /></button>
+          <span className="ml-2 text-[11px] text-slate-400">Paste or drop images, or paste a link</span>
+        </div>
+      )}
     </div>
   )
 }
