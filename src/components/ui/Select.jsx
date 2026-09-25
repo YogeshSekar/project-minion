@@ -14,7 +14,7 @@ function Select({ value, onChange, options = [], placeholder = 'Select…', clas
 
   return (
     <div ref={ref} className={`relative ${className}`}>
-      <button type="button" onClick={() => !disabled && setIsOpen(!isOpen)} disabled={disabled} aria-label={ariaLabel} aria-haspopup="listbox" aria-expanded={isOpen} className={`flex h-9 w-full items-center justify-between gap-2 rounded-full border border-slate-200 bg-white px-3 text-left text-sm font-medium text-slate-700 outline-none transition-colors hover:border-indigo-200 hover:bg-slate-50 focus-visible:border-indigo-400 focus-visible:ring-2 focus-visible:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-50 ${triggerClassName}`}>
+      <button type="button" onClick={() => !disabled && setIsOpen(!isOpen)} disabled={disabled} aria-label={ariaLabel} aria-haspopup="listbox" aria-expanded={isOpen} className={`flex h-9 w-full items-center justify-between gap-2 rounded-full border border-slate-200 bg-white px-3 text-left text-sm font-medium text-slate-700 outline-none transition-colors hover:border-accent-border hover:bg-slate-50 focus-visible:border-accent-focus focus-visible:ring-2 focus-visible:ring-accent-focus/30 disabled:cursor-not-allowed disabled:opacity-50 ${triggerClassName}`}>
         <span className="min-w-0 flex-1 truncate">{selected ? optionLabel(selected) : placeholder}</span>
         <ChevronDown className={`h-4 w-4 flex-none transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
@@ -27,7 +27,7 @@ function Select({ value, onChange, options = [], placeholder = 'Select…', clas
               <button type="button" role="option" aria-selected={isSelected}
                 key={`${nextValue}-${index}`}
                 onClick={() => handleSelect(option)}
-                className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors ${isSelected ? 'bg-indigo-50 font-semibold text-indigo-700' : 'text-slate-700 hover:bg-slate-50'}`}
+                className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors ${isSelected ? 'bg-accent-surface font-semibold text-accent-text' : 'text-slate-700 hover:bg-slate-50'}`}
               >
                 <span className="min-w-0 flex-1 truncate">{optionLabel(option)}</span>{isSelected && <Check className="h-4 w-4 flex-none" />}
               </button>

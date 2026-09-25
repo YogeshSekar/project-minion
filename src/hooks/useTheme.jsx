@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { DEFAULT_ACCENT, isValidAccent } from '../config/accentThemes'
 
 function useTheme() {
   // Theme state with localStorage persistence
@@ -12,6 +13,12 @@ function useTheme() {
     const savedFont = localStorage.getItem('font') || 'manrope'
     return savedFont
   })
+  // Accent state with validation and localStorage persistence
+  const [accent, setAccentState] = useState(() => {
+    const savedAccent = localStorage.getItem('accent')
+    return isValidAccent(savedAccent) ? savedAccent : DEFAULT_ACCENT
+  })
+
 
   // Wrapper to save theme to localStorage
   const setTheme = (newTheme) => {
@@ -23,6 +30,12 @@ function useTheme() {
   const setFont = (newFont) => {
     setFontState(newFont)
     localStorage.setItem('font', newFont)
+  }
+
+  const setAccent = (newAccent) => {
+    const validAccent = isValidAccent(newAccent) ? newAccent : DEFAULT_ACCENT
+    setAccentState(validAccent)
+    localStorage.setItem('accent', validAccent)
   }
 
   // Theme effect - applies theme classes to root element
@@ -76,11 +89,18 @@ function useTheme() {
     document.body.style.fontFamily = fonts[font] || fonts['manrope']
   }, [font])
 
+  // Accent effect - exposes the active palette to global CSS variables
+  useEffect(() => {
+    document.documentElement.dataset.accent = accent
+  }, [accent])
+
   return {
     theme,
     setTheme,
     font,
-    setFont
+    setFont,
+    accent,
+    setAccent
   }
 }
 

@@ -1,10 +1,13 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.jsx'
+import { DEFAULT_ACCENT, isValidAccent } from './config/accentThemes'
 import './App.css'
 
-// Apply theme immediately before React renders
+// Apply appearance preferences immediately before React renders
 const savedTheme = localStorage.getItem('theme') || 'system'
+const savedAccent = localStorage.getItem('accent')
+
 const applyInitialTheme = () => {
   if (savedTheme === 'light') {
     document.documentElement.classList.remove('dark')
@@ -17,7 +20,14 @@ const applyInitialTheme = () => {
   }
 }
 
+const applyInitialAccent = () => {
+  document.documentElement.dataset.accent = isValidAccent(savedAccent)
+    ? savedAccent
+    : DEFAULT_ACCENT
+}
+
 applyInitialTheme()
+applyInitialAccent()
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>

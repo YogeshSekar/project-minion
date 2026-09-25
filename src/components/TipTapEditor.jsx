@@ -671,12 +671,12 @@ function TipTapEditor({ content, onChange, editable = true, moveCursorToEnd = fa
         {pageLinkOptions.length > 0 && <div className="relative" ref={pageLinkRef}>
           <button type="button" onClick={openPageLinkPicker} className="inline-flex items-center gap-1 rounded px-2 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-200" title="Link another page"><FileText className="h-4 w-4" /> Link page</button>
           {pageLinkOpen && <div className="absolute left-0 top-full z-50 mt-1 w-72 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">
-            <input autoFocus value={pageLinkSearch} onChange={event => setPageLinkSearch(event.target.value)} placeholder="Search pages" className="h-8 w-full rounded-lg border border-slate-200 px-2.5 text-xs outline-none focus:border-indigo-400" />
+                <input autoFocus value={pageLinkSearch} onChange={event => setPageLinkSearch(event.target.value)} placeholder="Search pages" className="h-8 w-full rounded-lg border border-slate-200 px-2.5 text-xs outline-none focus:border-accent-focus" />
             <div className="no-scrollbar mt-1 max-h-48 overflow-y-auto">
-              {pageLinkOptions.filter(page => page.title.toLowerCase().includes(pageLinkSearch.toLowerCase())).slice(0, 20).map(page => <button key={page.id} type="button" onClick={() => insertPageLink(page)} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-xs text-slate-700 hover:bg-indigo-50 hover:text-indigo-700"><FileText className="h-3.5 w-3.5 flex-none" /><span className="truncate">{page.title}</span></button>)}
+                  {pageLinkOptions.filter(page => page.title.toLowerCase().includes(pageLinkSearch.toLowerCase())).slice(0, 20).map(page => <button key={page.id} type="button" onClick={() => insertPageLink(page)} className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-xs text-slate-700 hover:bg-accent-surface hover:text-accent-text"><FileText className="h-3.5 w-3.5 flex-none" /><span className="truncate">{page.title}</span></button>)}
               {!pageLinkOptions.some(page => page.title.toLowerCase().includes(pageLinkSearch.toLowerCase())) && <p className="px-2 py-3 text-xs text-slate-500">No matching pages</p>}
             </div>
-            <label className="mt-1 flex cursor-pointer items-center gap-2 border-t border-slate-100 px-2 pt-2 text-xs text-slate-600"><input type="checkbox" checked={pinNewPageLink} onChange={event => setPinNewPageLink(event.target.checked)} className="accent-indigo-600" /> Pin this page link</label>
+                <label className="mt-1 flex cursor-pointer items-center gap-2 border-t border-slate-100 px-2 pt-2 text-xs text-slate-600"><input type="checkbox" checked={pinNewPageLink} onChange={event => setPinNewPageLink(event.target.checked)} className="accent-accent-solid" /> Pin this page link</label>
           </div>}
         </div>}
 
@@ -848,14 +848,14 @@ function TipTapEditor({ content, onChange, editable = true, moveCursorToEnd = fa
       {!compact && pinnedItems.length > 0 && (
         <div className="no-scrollbar mx-6 mt-4 mb-1 max-h-36 flex-none space-y-2 overflow-y-auto" aria-label="Pinned page content">
           {pinnedItems.map(item => (
-            <div key={item.id} className="group flex items-start gap-2 rounded-r-lg border-l-2 border-indigo-400 bg-indigo-50/60 px-3 py-2 text-sm text-slate-700">
-              <Pin className="mt-0.5 h-3.5 w-3.5 flex-none text-indigo-500" aria-hidden="true" />
+            <div key={item.id} className="group flex items-start gap-2 rounded-r-lg border-l-2 border-accent-focus bg-accent-surface/60 px-3 py-2 text-sm text-slate-700">
+              <Pin className="mt-0.5 h-3.5 w-3.5 flex-none text-accent-text" aria-hidden="true" />
               {item.kind === 'page' ? (
-                <button type="button" onClick={() => onOpenPageLink?.(item.linked_page_id)} className="min-w-0 flex-1 text-left font-medium text-indigo-700 hover:underline">{item.displayText}</button>
+                <button type="button" onClick={() => onOpenPageLink?.(item.linked_page_id)} className="min-w-0 flex-1 text-left font-medium text-accent-text hover:underline">{item.displayText}</button>
               ) : (
                 <span className="min-w-0 flex-1 whitespace-pre-wrap break-words">{item.displayText}</span>
               )}
-              <button type="button" onClick={() => onUnpin?.(item)} disabled={pinBusy} className="grid h-5 w-5 flex-none place-items-center rounded text-slate-400 opacity-60 hover:bg-indigo-100 hover:text-slate-700 hover:opacity-100 focus-visible:opacity-100 disabled:opacity-30" title="Unpin" aria-label={`Unpin ${item.displayText}`}><span aria-hidden="true">×</span></button>
+              <button type="button" onClick={() => onUnpin?.(item)} disabled={pinBusy} className="grid h-5 w-5 flex-none place-items-center rounded text-slate-400 opacity-60 hover:bg-accent-surface-hover hover:text-slate-700 hover:opacity-100 focus-visible:opacity-100 disabled:opacity-30" title="Unpin" aria-label={`Unpin ${item.displayText}`}><span aria-hidden="true">×</span></button>
             </div>
           ))}
         </div>
@@ -963,7 +963,7 @@ function TipTapEditor({ content, onChange, editable = true, moveCursorToEnd = fa
               onOpenPageLink(Number(match[1]))
             }
           }}
-          className={compact ? 'prose prose-sm max-w-none px-4 py-2.5 text-slate-800 [&_.ProseMirror]:min-h-[28px] [&_.ProseMirror]:outline-none [&_.ProseMirror_p]:my-0.5 [&_.ProseMirror_a]:text-indigo-600 [&_.ProseMirror_a]:underline [&_.ProseMirror_img]:max-w-full [&_.ProseMirror_img]:rounded-lg' : `prose prose-sm dark:prose-invert max-w-none p-6 focus:outline-none min-h-[200px] h-full
+          className={compact ? 'prose prose-sm max-w-none px-4 py-2.5 text-slate-800 [&_.ProseMirror]:min-h-[28px] [&_.ProseMirror]:outline-none [&_.ProseMirror_p]:my-0.5 [&_.ProseMirror_a]:text-accent-text [&_.ProseMirror_a]:underline [&_.ProseMirror_img]:max-w-full [&_.ProseMirror_img]:rounded-lg' : `prose prose-sm dark:prose-invert max-w-none p-6 focus:outline-none min-h-[200px] h-full
             prose-p:my-3 prose-p:leading-relaxed prose-p:text-gray-800 prose-p:dark:text-gray-200
             prose-headings:my-4 prose-headings:font-semibold prose-headings:text-gray-900 prose-headings:dark:text-gray-100 prose-headings:tracking-tight
             prose-h1:text-3xl prose-h1:font-bold prose-h1:mb-4 prose-h1:pb-2 prose-h1:border-b prose-h1:border-gray-200
@@ -1004,10 +1004,10 @@ function TipTapEditor({ content, onChange, editable = true, moveCursorToEnd = fa
       </div>
       {showToolbar && compact && (
         <div className="flex flex-none items-center gap-1 border-t border-slate-200 px-2 py-1.5">
-          <button type="button" onClick={() => editor.chain().focus().toggleBold().run()} className={`grid h-7 w-7 place-items-center rounded-md transition-colors ${editor.isActive('bold') ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500 hover:bg-slate-100'}`} title="Bold" aria-label="Bold"><Bold className="h-4 w-4" /></button>
-          <button type="button" onClick={() => editor.chain().focus().toggleItalic().run()} className={`grid h-7 w-7 place-items-center rounded-md transition-colors ${editor.isActive('italic') ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500 hover:bg-slate-100'}`} title="Italic" aria-label="Italic"><Italic className="h-4 w-4" /></button>
-          <button type="button" onClick={handleCompactLink} className="grid h-7 w-7 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-indigo-700" title="Add link" aria-label="Add link"><LinkIcon className="h-4 w-4" /></button>
-          <button type="button" onClick={handleFileSelect} className="grid h-7 w-7 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-indigo-700" title="Add image" aria-label="Add image"><ImagePlus className="h-4 w-4" /></button>
+      <button type="button" onClick={() => editor.chain().focus().toggleBold().run()} className={`grid h-7 w-7 place-items-center rounded-md transition-colors ${editor.isActive('bold') ? 'bg-accent-surface text-accent-text' : 'text-slate-500 hover:bg-slate-100'}`} title="Bold" aria-label="Bold"><Bold className="h-4 w-4" /></button>
+      <button type="button" onClick={() => editor.chain().focus().toggleItalic().run()} className={`grid h-7 w-7 place-items-center rounded-md transition-colors ${editor.isActive('italic') ? 'bg-accent-surface text-accent-text' : 'text-slate-500 hover:bg-slate-100'}`} title="Italic" aria-label="Italic"><Italic className="h-4 w-4" /></button>
+      <button type="button" onClick={handleCompactLink} className="grid h-7 w-7 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-accent-text" title="Add link" aria-label="Add link"><LinkIcon className="h-4 w-4" /></button>
+      <button type="button" onClick={handleFileSelect} className="grid h-7 w-7 place-items-center rounded-md text-slate-500 hover:bg-slate-100 hover:text-accent-text" title="Add image" aria-label="Add image"><ImagePlus className="h-4 w-4" /></button>
           <span className="ml-2 text-[11px] text-slate-400">Paste or drop images, or paste a link</span>
         </div>
       )}

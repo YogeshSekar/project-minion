@@ -41,7 +41,7 @@ function App() {
   }[activeItem] || 'Home'
   
   // Use hooks
-  const { theme, setTheme, font, setFont } = useTheme()
+  const { theme, setTheme, font, setFont, accent, setAccent } = useTheme()
   const {
     isSettingsOpen,
     openSettings,
@@ -279,6 +279,8 @@ function App() {
         setTheme={setTheme}
         font={font}
         setFont={setFont}
+        accent={accent}
+        setAccent={setAccent}
       />
       
       {/* 📝 Task Side Panel (Create/Edit) */}

@@ -541,7 +541,7 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
               aria-label="Task view"
             >
               <span
-                className={`pointer-events-none absolute inset-y-0.5 left-0.5 w-24 rounded-full border border-indigo-200 bg-indigo-100 transition-transform duration-300 ease-out ${viewMode === 'list' ? 'translate-x-[100px]' : 'translate-x-0'}`}
+          className={`pointer-events-none absolute inset-y-0.5 left-0.5 w-24 rounded-full border border-accent-border bg-accent-muted transition-transform duration-300 ease-out ${viewMode === 'list' ? 'translate-x-[100px]' : 'translate-x-0'}`}
                 aria-hidden="true"
               />
               <button
@@ -550,7 +550,7 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
                 aria-pressed={viewMode === 'board'}
                 className={`relative z-10 flex h-9 w-24 items-center justify-center gap-2 rounded-full px-3 text-sm font-semibold transition-colors duration-300 ${
                   viewMode === 'board'
-                    ? 'text-indigo-700'
+                  ? 'text-accent-text'
                     : 'text-slate-700 hover:text-slate-900'
                 }`}
                 title="Board View"
@@ -564,7 +564,7 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
                 aria-pressed={viewMode === 'list'}
                 className={`relative z-10 flex h-9 w-24 items-center justify-center gap-2 rounded-full px-3 text-sm font-semibold transition-colors duration-300 ${
                   viewMode === 'list'
-                    ? 'text-indigo-700'
+                  ? 'text-accent-text'
                     : 'text-slate-700 hover:text-slate-900'
                 }`}
                 title="List View"
@@ -585,7 +585,7 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
                   projectsDropdown.setIsOpen(nextOpen)
                   if (nextOpen) setProjectSearch('')
                 }}
-                className={`inline-flex h-9 min-w-[180px] max-w-[240px] items-center justify-between gap-2 rounded-full border px-3 text-sm font-medium transition-colors ${projectsDropdown.isOpen || selectedProjects.length > 0 ? 'border-indigo-300 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:bg-indigo-50/50'}`}
+              className={`inline-flex h-9 min-w-[180px] max-w-[240px] items-center justify-between gap-2 rounded-full border px-3 text-sm font-medium transition-colors ${projectsDropdown.isOpen || selectedProjects.length > 0 ? 'border-accent-focus bg-accent-surface text-accent-text' : 'border-slate-200 bg-white text-slate-700 hover:border-accent-border hover:bg-accent-surface/50'}`}
                 aria-expanded={projectsDropdown.isOpen}
                 aria-haspopup="listbox"
               >
@@ -610,7 +610,7 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
                         <button
                           type="button"
                           onClick={() => setSelectedProjects([])}
-                          className="text-xs font-semibold text-indigo-700 hover:text-indigo-900"
+                    className="text-xs font-semibold text-accent-text hover:text-accent-solid-hover"
                         >
                           Clear selection
                         </button>
@@ -624,7 +624,7 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
                         value={projectSearch}
                         onChange={(event) => setProjectSearch(event.target.value)}
                         placeholder="Search projects"
-                        className="h-9 w-full rounded-full border border-gray-200 bg-gray-50 pl-9 pr-3 text-sm text-gray-800 outline-none transition-colors placeholder:text-gray-400 focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-100"
+                  className="h-9 w-full rounded-full border border-gray-200 bg-gray-50 pl-9 pr-3 text-sm text-gray-800 outline-none transition-colors placeholder:text-gray-400 focus:border-accent-focus focus:bg-white focus:ring-2 focus:ring-accent-focus/30"
                         autoFocus
                       />
                     </div>
@@ -633,7 +633,7 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
                       {orderedProjects.map(project => (
                         <label key={project.id} className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
                           selectedProjects.includes(project.id)
-                            ? 'bg-indigo-50 text-indigo-800'
+                          ? 'bg-accent-surface text-accent-text'
                             : 'text-gray-700 hover:bg-gray-50'
                         }`}>
                           <input
@@ -646,7 +646,7 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
                                 setSelectedProjects(selectedProjects.filter(id => id !== project.id))
                               }
                             }}
-                            className="rounded border-gray-300 accent-indigo-600 focus:ring-indigo-500"
+                          className="rounded border-gray-300 accent-accent-solid focus:ring-accent-focus"
                           />
                           <span className="truncate">{project.title}</span>
                         </label>
@@ -666,7 +666,7 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
               <button
                 type="button"
                 onClick={() => dateDropdown.setIsOpen(!dateDropdown.isOpen)}
-                className={`inline-flex h-9 min-w-[128px] items-center justify-between gap-2 rounded-full border bg-white px-3 text-sm font-medium transition-colors ${dateDropdown.isOpen || filterOption !== 'all' ? 'border-indigo-300 bg-indigo-50 text-indigo-700' : 'border-gray-200 text-slate-700 hover:bg-gray-50 hover:text-slate-900'}`}
+              className={`inline-flex h-9 min-w-[128px] items-center justify-between gap-2 rounded-full border bg-white px-3 text-sm font-medium transition-colors ${dateDropdown.isOpen || filterOption !== 'all' ? 'border-accent-focus bg-accent-surface text-accent-text' : 'border-gray-200 text-slate-700 hover:bg-gray-50 hover:text-slate-900'}`}
                 aria-expanded={dateDropdown.isOpen}
               >
                 <Calendar className="h-4 w-4" />
@@ -686,7 +686,7 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
                         setFilterOption(value)
                         if (value !== 'custom') dateDropdown.setIsOpen(false)
                       }}
-                      className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm ${filterOption === value ? 'bg-indigo-50 font-semibold text-indigo-700' : 'text-gray-700 hover:bg-gray-50'}`}
+                      className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm ${filterOption === value ? 'bg-accent-surface font-semibold text-accent-text' : 'text-gray-700 hover:bg-gray-50'}`}
                     >
                       {label}
                       {filterOption === value && <CheckCircle className="h-4 w-4" />}
@@ -711,7 +711,7 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
               <button
                 type="button"
                 onClick={() => priorityDropdown.setIsOpen(!priorityDropdown.isOpen)}
-                className={`inline-flex h-9 min-w-[140px] items-center justify-between gap-2 rounded-full border bg-white px-3 text-sm font-medium transition-colors ${priorityDropdown.isOpen || priorityFilters.length > 0 ? 'border-indigo-300 bg-indigo-50 text-indigo-700' : 'border-gray-200 text-slate-700 hover:bg-gray-50 hover:text-slate-900'}`}
+              className={`inline-flex h-9 min-w-[140px] items-center justify-between gap-2 rounded-full border bg-white px-3 text-sm font-medium transition-colors ${priorityDropdown.isOpen || priorityFilters.length > 0 ? 'border-accent-focus bg-accent-surface text-accent-text' : 'border-gray-200 text-slate-700 hover:bg-gray-50 hover:text-slate-900'}`}
                 aria-expanded={priorityDropdown.isOpen}
               >
                 <span className="whitespace-nowrap">Priority: {priorityFilterLabel}</span>
@@ -721,17 +721,17 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
                 <div className="absolute left-0 top-full z-20 mt-2 w-56 rounded-xl border border-slate-200 bg-white p-3 shadow-md">
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">Priorities</span>
-                    {priorityFilters.length > 0 && <button type="button" onClick={() => setPriorityFilters([])} className="text-xs font-semibold text-indigo-700 hover:text-indigo-900">Clear</button>}
+                {priorityFilters.length > 0 && <button type="button" onClick={() => setPriorityFilters([])} className="text-xs font-semibold text-accent-text hover:text-accent-solid-hover">Clear</button>}
                   </div>
                   {[
                     ['high', 'High', 'bg-red-500'], ['medium', 'Medium', 'bg-amber-500'], ['low', 'Low', 'bg-emerald-500']
                   ].map(([value, label, dot]) => (
-                    <label key={value} className={`flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm ${priorityFilters.includes(value) ? 'bg-indigo-50 text-indigo-800' : 'text-gray-700 hover:bg-gray-50'}`}>
+                  <label key={value} className={`flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm ${priorityFilters.includes(value) ? 'bg-accent-surface text-accent-text' : 'text-gray-700 hover:bg-gray-50'}`}>
                       <input
                         type="checkbox"
                         checked={priorityFilters.includes(value)}
                         onChange={event => setPriorityFilters(event.target.checked ? [...priorityFilters, value] : priorityFilters.filter(item => item !== value))}
-                        className="rounded border-gray-300 accent-indigo-600"
+                      className="rounded border-gray-300 accent-accent-solid"
                       />
                       <span className={`h-2.5 w-2.5 rounded-full ${dot}`} />
                       <span>{label}</span>
@@ -747,7 +747,7 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
                 onClick={() => sortDropdown.setIsOpen(!sortDropdown.isOpen)}
                 className={`inline-flex h-9 min-w-[176px] items-center justify-between gap-2 rounded-full border bg-white px-3 text-sm font-medium transition-colors ${
                   sortDropdown.isOpen || sortOption !== 'created_date' || sortDirection !== 'desc'
-                    ? 'border-indigo-300 text-indigo-700'
+                ? 'border-accent-focus text-accent-text'
                     : 'border-gray-200 text-slate-700 hover:bg-gray-50 hover:text-slate-900'
                 }`}
                 aria-expanded={sortDropdown.isOpen}
@@ -764,7 +764,7 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
                       <button
                         type="button"
                         onClick={() => setSortDirection(current => current === 'asc' ? 'desc' : 'asc')}
-                        className="rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 transition-colors hover:bg-indigo-100"
+                  className="rounded-full border border-accent-border bg-accent-surface px-2.5 py-1 text-xs font-semibold text-accent-text transition-colors hover:bg-accent-surface-hover"
                         title={`Switch to ${sortDirection === 'asc' ? 'descending' : 'ascending'} order`}
                       >
                         {sortDirection === 'asc' ? 'Ascending ↑' : 'Descending ↓'}
@@ -785,7 +785,7 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
                             key={`${option}-${direction}`}
                             type="button"
                             onClick={() => chooseSort(option, direction)}
-                            className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${selected ? 'bg-indigo-50 font-semibold text-indigo-700' : 'text-gray-700 hover:bg-gray-50'}`}
+                        className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${selected ? 'bg-accent-surface font-semibold text-accent-text' : 'text-gray-700 hover:bg-gray-50'}`}
                           >
                             <span>{label}</span>
                             {selected && <CheckCircle className="h-4 w-4" />}
@@ -808,7 +808,7 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
                   onClick={() => groupDropdown.setIsOpen(!groupDropdown.isOpen)}
                   className={`inline-flex h-9 min-w-[132px] items-center justify-between gap-2 rounded-full border bg-white px-3 text-sm font-medium transition-colors ${
                     groupDropdown.isOpen || listGroupBy !== 'none'
-                      ? 'border-indigo-300 text-indigo-700'
+                ? 'border-accent-focus text-accent-text'
                       : 'border-gray-200 text-slate-700 hover:bg-gray-50 hover:text-slate-900'
                   }`}
                   aria-expanded={groupDropdown.isOpen}
@@ -830,7 +830,7 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
                         key={value}
                         type="button"
                         onClick={() => { setListGroupBy(value); groupDropdown.setIsOpen(false) }}
-                        className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${listGroupBy === value ? 'bg-indigo-50 font-semibold text-indigo-700' : 'text-gray-700 hover:bg-gray-50'}`}
+                      className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${listGroupBy === value ? 'bg-accent-surface font-semibold text-accent-text' : 'text-gray-700 hover:bg-gray-50'}`}
                       >
                         <span>{label}</span>
                         {listGroupBy === value && <CheckCircle className="h-4 w-4" />}
@@ -860,7 +860,7 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
           <button
             type="button"
             onClick={() => openTaskModal()}
-            className="order-first inline-flex h-9 items-center justify-center gap-2 rounded-full border border-indigo-600 bg-indigo-600 px-4 text-sm font-semibold text-white transition-colors duration-200 hover:border-indigo-700 hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
+          className="order-first inline-flex h-9 items-center justify-center gap-2 rounded-full border border-accent-solid bg-accent-solid px-4 text-sm font-semibold text-accent-foreground transition-colors duration-200 hover:border-accent-solid-hover hover:bg-accent-solid-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-focus"
           >
             <Plus className="h-4 w-4" />
             New task
@@ -878,7 +878,7 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
                   key={project.id}
                   type="button"
                   onClick={() => setSelectedProjects(selectedProjects.filter(id => id !== project.id))}
-                  className="inline-flex h-7 max-w-[220px] items-center gap-1.5 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 text-xs font-semibold text-indigo-700 transition-colors hover:border-indigo-300 hover:bg-indigo-100"
+              className="inline-flex h-7 max-w-[220px] items-center gap-1.5 rounded-full border border-accent-border bg-accent-surface px-2.5 text-xs font-semibold text-accent-text transition-colors hover:border-accent-focus hover:bg-accent-surface-hover"
                   title={`Remove ${project.title} filter`}
                 >
                   <span className="truncate">{project.title}</span>
@@ -898,7 +898,7 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col relative min-h-0 overflow-hidden bg-slate-100">
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-slate-100 dark:bg-slate-950">
         {initialLoading ? (
           <TasksLoadingState viewMode={viewMode} showDone={showDone} />
         ) : loadError ? (
@@ -947,7 +947,7 @@ function TasksPage({ taskRefreshTrigger = 0, openTaskModal, onActivityStarted, o
                 <button
                   type="button"
                   onClick={() => openTaskModal()}
-                  className="inline-flex h-9 items-center gap-2 rounded-full bg-indigo-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-indigo-700"
+            className="inline-flex h-9 items-center gap-2 rounded-full bg-accent-solid px-4 text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent-solid-hover"
                 >
                   <Plus className="h-4 w-4" />
                   New task

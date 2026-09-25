@@ -41,7 +41,7 @@ function InlineMenu({ value, options, onChange, triggerClassName = '', searchabl
           {searchable && (
             <div className="relative mb-2">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search projects" className="h-9 w-full rounded-full border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm text-slate-800 outline-none focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-100" autoFocus />
+          <input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search projects" className="h-9 w-full rounded-full border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm text-slate-800 outline-none focus:border-accent-focus focus:bg-white focus:ring-2 focus:ring-accent-focus/30" autoFocus />
             </div>
           )}
           <div className="max-h-64 overflow-y-auto">
@@ -52,7 +52,7 @@ function InlineMenu({ value, options, onChange, triggerClassName = '', searchabl
               onClick={() => { onChange(option.value); setIsOpen(false) }}
               role="option"
               aria-selected={String(option.value) === String(value)}
-              className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors ${String(option.value) === String(value) ? 'bg-indigo-50 font-semibold text-indigo-700' : 'text-slate-700 hover:bg-slate-50'}`}
+                  className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors ${String(option.value) === String(value) ? 'bg-accent-surface font-semibold text-accent-text' : 'text-slate-700 hover:bg-slate-50'}`}
             >
               {option.dot && <span className={`h-2 w-2 shrink-0 rounded-full ${option.dot}`} />}
               <span className="min-w-0 flex-1 truncate">{option.label}</span>
@@ -104,7 +104,7 @@ function TaskActions({ task, isRunning, onEdit, onLinkPage, onDelete, onAddToTod
               <Pencil className="h-3.5 w-3.5" />
               Edit task
             </button>
-            {onLinkPage && <button type="button" onClick={() => onLinkPage(task)} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-medium text-slate-700 hover:bg-indigo-50 hover:text-indigo-700">
+            {onLinkPage && <button type="button" onClick={() => onLinkPage(task)} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-medium text-slate-700 hover:bg-accent-surface hover:text-accent-text">
               <Link2 className="h-3.5 w-3.5" />
               Link page
             </button>}
@@ -150,9 +150,9 @@ function QuickAddRow({ projects, onQuickAddTask }) {
   }
 
   return (
-    <div className="relative z-20 flex-none rounded-xl border border-indigo-200 bg-indigo-50/50 px-3 py-3 transition-colors focus-within:border-indigo-300">
+    <div className="relative z-20 flex-none rounded-xl border border-accent-border bg-accent-surface/50 px-3 py-3 transition-colors focus-within:border-accent-focus">
       <div className="flex min-h-9 items-center gap-2">
-        <span className="grid h-9 w-9 flex-none place-items-center rounded-full bg-indigo-600 text-white"><Plus className="h-4 w-4" /></span>
+        <span className="grid h-9 w-9 flex-none place-items-center rounded-full bg-accent-solid text-accent-foreground"><Plus className="h-4 w-4" /></span>
         <input
           ref={titleInputRef}
           type="text"
@@ -181,7 +181,7 @@ function QuickAddRow({ projects, onQuickAddTask }) {
             <InlineMenu value={projectId} options={[{ value: '', label: 'No project' }, ...(projects || []).map(project => ({ value: project.id, label: project.title }))]} onChange={setProjectId} searchable align="right" triggerClassName="max-w-[116px] text-xs font-medium outline-none" />
           </div>
         </div>
-        <button type="button" onClick={submit} disabled={!title.trim() || saving} className="inline-flex h-9 flex-none items-center gap-1.5 rounded-full bg-indigo-600 px-4 text-xs font-semibold text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40">
+        <button type="button" onClick={submit} disabled={!title.trim() || saving} className="inline-flex h-9 flex-none items-center gap-1.5 rounded-full bg-accent-solid px-4 text-xs font-semibold text-accent-foreground transition-colors hover:bg-accent-solid-hover disabled:cursor-not-allowed disabled:opacity-40">
           {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
           Add
         </button>

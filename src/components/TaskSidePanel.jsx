@@ -337,10 +337,10 @@ function TaskSidePanel({
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-1.5">
             <span className="mr-1 text-[11px] font-semibold text-slate-400">Quick set</span>
-            <button type="button" onClick={() => handleChange('scheduled_date', toDateInput(todayDate))} className="h-7 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 text-xs font-semibold text-indigo-700 transition-colors hover:bg-indigo-100">Today</button>
-            <button type="button" onClick={() => handleChange('scheduled_date', toDateInput(tomorrowDate))} className="h-7 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 text-xs font-semibold text-indigo-700 transition-colors hover:bg-indigo-100">Tomorrow</button>
+            <button type="button" onClick={() => handleChange('scheduled_date', toDateInput(todayDate))} className="h-7 rounded-full border border-accent-border bg-accent-surface px-2.5 text-xs font-semibold text-accent-text transition-colors hover:bg-accent-surface-hover">Today</button>
+            <button type="button" onClick={() => handleChange('scheduled_date', toDateInput(tomorrowDate))} className="h-7 rounded-full border border-accent-border bg-accent-surface px-2.5 text-xs font-semibold text-accent-text transition-colors hover:bg-accent-surface-hover">Tomorrow</button>
             {quickProjects.map(project => (
-              <button key={project.id} type="button" onClick={() => handleProjectChange(project.id)} className={`h-7 max-w-[160px] truncate rounded-full border px-2.5 text-xs font-semibold transition-colors ${formData.project_id === project.id ? 'border-indigo-200 bg-indigo-50 text-indigo-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`} title={project.title}>
+              <button key={project.id} type="button" onClick={() => handleProjectChange(project.id)} className={`h-7 max-w-[160px] truncate rounded-full border px-2.5 text-xs font-semibold transition-colors ${formData.project_id === project.id ? 'border-accent-border bg-accent-surface text-accent-text' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`} title={project.title}>
                 {project.title}
               </button>
             ))}
@@ -354,7 +354,7 @@ function TaskSidePanel({
 <div className="flex min-h-0 w-[58%] min-w-0 flex-col pr-6">
   {/* Description */}
   <div className="flex min-h-0 flex-1 flex-col">
-    <div className="relative min-h-[220px] w-full flex-1 overflow-hidden rounded-xl border border-slate-200 bg-[#fffefa] focus-within:border-indigo-300 focus-within:ring-2 focus-within:ring-indigo-100">
+        <div className="relative min-h-[220px] w-full flex-1 overflow-hidden rounded-xl border border-slate-200 bg-[#fffefa] focus-within:border-accent-focus focus-within:ring-2 focus-within:ring-accent-focus/30">
       {descriptionIsEmpty && <span className="pointer-events-none absolute left-6 top-5 z-10 text-sm font-medium text-slate-400">Description</span>}
       <TipTapEditor
         content={formData.description}
@@ -404,7 +404,7 @@ function TaskSidePanel({
                         onClick={() => {
                           handleChange('status', status.value)
                         }}
-                        className={`w-full flex items-center gap-2 px-2 py-1.5 text-sm transition-colors ${formData.status === status.value ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700 hover:bg-slate-50'}`}
+                                  className={`w-full flex items-center gap-2 px-2 py-1.5 text-sm transition-colors ${formData.status === status.value ? 'bg-accent-surface text-accent-text' : 'text-slate-700 hover:bg-slate-50'}`}
                       >
                         <span className={`w-1.5 h-1.5 rounded-full ${status.color}`}></span>
                         <span>{status.label}</span>
@@ -460,7 +460,7 @@ function TaskSidePanel({
                         handleProjectChange(null)
                       }}
                       className={`w-full text-left px-2 py-1.5 text-sm ${
-                        !formData.project_id ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700 hover:bg-slate-50'
+                                  !formData.project_id ? 'bg-accent-surface text-accent-text' : 'text-slate-700 hover:bg-slate-50'
                       }`}
                     >
                       No Project
@@ -472,7 +472,7 @@ function TaskSidePanel({
                           handleProjectChange(project.id)
                         }}
                         className={`w-full text-left px-2 py-1.5 text-sm ${
-                          formData.project_id === project.id ? 'bg-indigo-50 text-indigo-700' : 'text-slate-700 hover:bg-slate-50'
+                                      formData.project_id === project.id ? 'bg-accent-surface text-accent-text' : 'text-slate-700 hover:bg-slate-50'
                         }`}
                       >
                         {project.title}
@@ -486,15 +486,15 @@ function TaskSidePanel({
               <div className="grid min-h-10 grid-cols-[112px_1fr] items-start gap-3 border-b border-slate-200 px-1 py-1.5">
                 <div className="pt-1.5 text-xs font-semibold text-slate-500">Pages</div>
                 <div className="min-w-0">
-                  <button type="button" onClick={() => setShowPagePicker(value => !value)} aria-expanded={showPagePicker} className="flex h-7 w-full items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 text-left text-xs font-semibold text-slate-600 transition-colors hover:border-indigo-200 hover:bg-indigo-50">
-                    <Link2 className="h-3.5 w-3.5 flex-none text-indigo-600" />
+                      <button type="button" onClick={() => setShowPagePicker(value => !value)} aria-expanded={showPagePicker} className="flex h-7 w-full items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 text-left text-xs font-semibold text-slate-600 transition-colors hover:border-accent-border hover:bg-accent-surface">
+                        <Link2 className="h-3.5 w-3.5 flex-none text-accent-text" />
                     <span className="truncate">{pagesLoading ? 'Loading pages…' : linkedPages.length === 1 ? linkedPages[0].title : linkedPages.length ? `${linkedPages.length} linked pages` : 'Link a page'}</span>
                   </button>
                   {showPagePicker && <div className="mt-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm">
-                    <input value={pageSearch} onChange={event => setPageSearch(event.target.value)} placeholder="Search pages" className="h-8 w-full rounded-md border border-slate-200 px-2 text-xs outline-none focus:border-indigo-400" />
+                          <input value={pageSearch} onChange={event => setPageSearch(event.target.value)} placeholder="Search pages" className="h-8 w-full rounded-md border border-slate-200 px-2 text-xs outline-none focus:border-accent-focus" />
                     <div className="no-scrollbar mt-1 max-h-36 overflow-y-auto">
-                      {matchingPages.length ? matchingPages.map(page => <button key={page.id} type="button" onClick={() => setLinkedPageIds(current => current.includes(page.id) ? current.filter(id => id !== page.id) : [...current, page.id])} className="flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-xs text-slate-700 hover:bg-indigo-50">
-                        <span className={`grid h-3.5 w-3.5 flex-none place-items-center rounded border ${linkedPageIds.includes(page.id) ? 'border-indigo-600 bg-indigo-600 text-white' : 'border-slate-300'}`}>{linkedPageIds.includes(page.id) && <Check className="h-2.5 w-2.5" />}</span>
+                            {matchingPages.length ? matchingPages.map(page => <button key={page.id} type="button" onClick={() => setLinkedPageIds(current => current.includes(page.id) ? current.filter(id => id !== page.id) : [...current, page.id])} className="flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left text-xs text-slate-700 hover:bg-accent-surface">
+                              <span className={`grid h-3.5 w-3.5 flex-none place-items-center rounded border ${linkedPageIds.includes(page.id) ? 'border-accent-solid bg-accent-solid text-accent-foreground' : 'border-slate-300'}`}>{linkedPageIds.includes(page.id) && <Check className="h-2.5 w-2.5" />}</span>
                         <span className="truncate">{page.title}</span>
                       </button>) : <p className="px-2 py-2 text-xs text-slate-500">No matching pages</p>}
                     </div>
@@ -530,7 +530,7 @@ function TaskSidePanel({
                           }
                         }}
                         className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                          formData.is_recurring ? 'bg-indigo-500' : 'bg-slate-300'
+                                  formData.is_recurring ? 'bg-accent-solid' : 'bg-slate-300'
                         }`}
                       >
                         <span
@@ -546,9 +546,9 @@ function TaskSidePanel({
                         <Dropdown
                           trigger={
                             <button
-                              className="flex h-7 w-full items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-2.5 text-xs font-semibold text-indigo-700 transition-colors hover:bg-indigo-100"
+                                  className="flex h-7 w-full items-center gap-2 rounded-full border border-accent-border bg-accent-surface px-2.5 text-xs font-semibold text-accent-text transition-colors hover:bg-accent-surface-hover"
                             >
-                              <span className="h-1.5 w-1.5 rounded-full bg-indigo-500"></span>
+                                  <span className="h-1.5 w-1.5 rounded-full bg-accent-solid"></span>
                               {formData.recurrence_type ? formData.recurrence_type.charAt(0).toUpperCase() + formData.recurrence_type.slice(1).replace('_', ' ') : 'Pattern'}
                             </button>
                           }
@@ -595,7 +595,7 @@ function TaskSidePanel({
                       }}
                       placeholder="0"
                       min="0"
-                      className="h-7 w-16 rounded-full border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-600 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+                                          className="h-7 w-16 rounded-full border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-600 outline-none focus:border-accent-focus focus:ring-2 focus:ring-accent-focus/30"
                     />
                     <span className="text-xs text-slate-500">minutes</span>
                   </div>
@@ -614,7 +614,7 @@ function TaskSidePanel({
                         }}
                         placeholder="0"
                         min="0"
-                        className="h-7 w-16 rounded-full border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-600 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100"
+                                          className="h-7 w-16 rounded-full border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-600 outline-none focus:border-accent-focus focus:ring-2 focus:ring-accent-focus/30"
                       />
                       <span className="text-xs text-slate-500">minutes</span>
                     </div>
@@ -656,7 +656,7 @@ function TaskSidePanel({
                 type="button"
                 onClick={handleSubmit}
                 disabled={!canSave}
-                className="inline-flex h-9 min-w-[124px] items-center justify-center gap-1.5 rounded-full border border-indigo-600 bg-indigo-600 px-4 text-xs font-semibold text-white transition-colors hover:border-indigo-700 hover:bg-indigo-700 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-200 disabled:text-slate-400"
+              className="inline-flex h-9 min-w-[124px] items-center justify-center gap-1.5 rounded-full border border-accent-solid bg-accent-solid px-4 text-xs font-semibold text-accent-foreground transition-colors hover:border-accent-solid-hover hover:bg-accent-solid-hover disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-200 disabled:text-slate-400"
                 title="Save task (Ctrl+Enter)"
               >
                 {isLoading ? (

@@ -42,10 +42,10 @@ function TaskCard({
   const isRunning = runningActivity && runningActivity.reference_id === task.id && runningActivity.reference_type === 'task'
 
   const priorityBadge = {
-    high: 'border-red-200 bg-red-50 text-red-700',
-    medium: 'border-amber-200 bg-amber-50 text-amber-700',
-    low: 'border-emerald-200 bg-emerald-50 text-emerald-700'
-  }[String(task.priority || 'medium').toLowerCase()] || 'border-slate-200 bg-slate-50 text-slate-600'
+    high: 'border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300',
+    medium: 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300',
+    low: 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300'
+  }[String(task.priority || 'medium').toLowerCase()] || 'border-slate-200 bg-slate-50 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'
 
   useEffect(() => {
     if (!menuOpen) return undefined
@@ -143,9 +143,9 @@ function TaskCard({
           }
           if (!isDragging) onEdit(task)
         }}
-        className={`group relative rounded-xl border bg-white p-3 shadow-sm transition-all duration-200 ease-out
+        className={`group relative rounded-xl border bg-white p-3 shadow-sm transition-all duration-200 ease-out dark:bg-slate-900 dark:shadow-none
           ${isDragging ? 'cursor-grabbing opacity-40' : 'cursor-pointer'}
-          ${isDraft ? 'border-sky-300 ring-2 ring-sky-100 shadow-md' : isRunning ? 'border-emerald-400 ring-1 ring-emerald-100 shadow-md' : accent ? 'border-indigo-100 bg-indigo-50/60 hover:-translate-y-0.5 hover:border-indigo-200 hover:bg-indigo-50 hover:shadow-md' : 'border-slate-200/90 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md'}
+        ${isDraft ? 'border-sky-300 ring-2 ring-sky-100 shadow-md dark:border-sky-700 dark:ring-sky-900' : isRunning ? 'border-emerald-400 ring-1 ring-emerald-100 shadow-md dark:ring-emerald-900' : accent ? 'border-accent-border bg-accent-surface/60 hover:-translate-y-0.5 hover:border-accent-focus hover:bg-accent-surface hover:shadow-md' : 'border-slate-200/90 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-slate-700 dark:hover:border-slate-600'}
         `}
       >
         {/* Primary row */}
@@ -281,7 +281,7 @@ function TaskCard({
                   Edit task
                 </button>
                 {onLinkPage && (
-                  <button type="button" onClick={() => onLinkPage(task)} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-medium text-slate-700 hover:bg-indigo-50 hover:text-indigo-700">
+              <button type="button" onClick={() => onLinkPage(task)} className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-medium text-slate-700 hover:bg-accent-surface hover:text-accent-text">
                     <Link2 className="h-3.5 w-3.5" />
                     Link page
                   </button>

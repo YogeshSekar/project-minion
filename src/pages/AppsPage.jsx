@@ -95,7 +95,7 @@ function AppsPage() {
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 flex-1">{app.description}</p>
                 
                 {app.isInstalled && (
-                  <button className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white rounded-lg transition-colors text-sm mt-auto">
+                  <button className="mt-auto flex w-full items-center justify-center gap-2 rounded-lg bg-accent-solid px-4 py-2 text-sm text-accent-foreground transition-colors hover:bg-accent-solid-hover">
                     <ExternalLink className="w-4 h-4" />
                     Open
                   </button>
@@ -105,9 +105,9 @@ function AppsPage() {
           })}
 
           {/* Add New App Card */}
-          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700 p-6 flex flex-col items-center justify-center text-center hover:border-purple-400 dark:hover:border-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/10 transition-all duration-200 cursor-pointer">
-            <div className="w-12 h-12 bg-purple-100 dark:bg-purple-900/30 rounded-full flex items-center justify-center mb-4">
-              <Plus className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+          <div className="flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-6 text-center transition-all duration-200 hover:border-accent-focus hover:bg-accent-surface dark:border-gray-700 dark:bg-gray-800">
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-accent-surface">
+              <Plus className="h-6 w-6 text-accent-text" />
             </div>
             <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Add New App</h3>
             <p className="text-sm text-gray-600 dark:text-gray-400">Discover more applications</p>

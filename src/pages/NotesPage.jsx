@@ -605,7 +605,7 @@ function NotesPage({ pageToOpen, onPageOpened, openTaskModal, taskRefreshTrigger
       <div className="relative z-30 flex-none overflow-visible border-b border-slate-200 bg-white">
         <div className="flex h-16 min-w-0 items-center">
           <div className="flex h-16 w-72 flex-none items-center justify-between gap-2 border-r border-slate-200 bg-white px-3">
-            <button type="button" onClick={handleCreatePage} className="inline-flex h-9 min-w-[110px] flex-none items-center justify-center gap-2 rounded-full border border-indigo-600 bg-indigo-600 px-4 text-sm font-semibold text-white transition-colors duration-200 hover:border-indigo-700 hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300" title="Create page">
+          <button type="button" onClick={handleCreatePage} className="inline-flex h-9 min-w-[110px] flex-none items-center justify-center gap-2 rounded-full border border-accent-solid bg-accent-solid px-4 text-sm font-semibold text-accent-foreground transition-colors duration-200 hover:border-accent-solid-hover hover:bg-accent-solid-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-focus" title="Create page">
               <Plus className="h-4 w-4" /> New page
             </button>
             <span className="text-xs font-medium tabular-nums text-slate-500" aria-live="polite">{visiblePages.length} {visiblePages.length === 1 ? 'page' : 'pages'}</span>
@@ -613,8 +613,8 @@ function NotesPage({ pageToOpen, onPageOpened, openTaskModal, taskRefreshTrigger
 
           <div className="flex h-16 min-w-0 flex-1 items-center gap-3 px-3">
           <div className="relative w-48 flex-none">
-            <FolderOpen className="pointer-events-none absolute left-3 top-2.5 z-10 h-4 w-4 text-indigo-600" />
-            <Select value={selectedProjectId || ''} onChange={changeProject} options={[...projects.map(project => ({ value: String(project.id), label: project.title })), { value: 'unassigned', label: 'Unassigned pages' }]} ariaLabel="Select project" triggerClassName="border-indigo-200 bg-indigo-50 pl-9 pr-3 font-semibold text-indigo-800 hover:border-indigo-300 hover:bg-indigo-100" menuClassName="w-64" />
+            <FolderOpen className="pointer-events-none absolute left-3 top-2.5 z-10 h-4 w-4 text-accent-text" />
+            <Select value={selectedProjectId || ''} onChange={changeProject} options={[...projects.map(project => ({ value: String(project.id), label: project.title })), { value: 'unassigned', label: 'Unassigned pages' }]} ariaLabel="Select project" triggerClassName="border-accent-border bg-accent-surface pl-9 pr-3 font-semibold text-accent-text hover:border-accent-focus hover:bg-accent-surface-hover" menuClassName="w-64" />
           </div>
           <div ref={sectionRailRef} className="relative flex h-10 min-w-0 flex-1 items-center gap-1 overflow-x-auto rounded-full border border-slate-200 bg-slate-50 p-1 no-scrollbar" aria-label="Sections">
           <span
@@ -622,22 +622,22 @@ function NotesPage({ pageToOpen, onPageOpened, openTaskModal, taskRefreshTrigger
             className={`pointer-events-none absolute inset-y-1 left-0 z-0 rounded-full border border-slate-200 bg-white transition-[transform,width,opacity] duration-300 ease-out ${sectionIndicator.visible ? 'opacity-100' : 'opacity-0'}`}
             style={{ width: sectionIndicator.width, transform: `translateX(${sectionIndicator.left}px)` }}
           />
-          <button ref={element => { if (element) sectionTabRefs.current.set('all', element); else sectionTabRefs.current.delete('all') }} type="button" onClick={() => changeArea('all')} className={`relative z-10 h-8 flex-none rounded-full px-3.5 text-sm font-medium transition-colors duration-300 ${selectedAreaId === 'all' ? 'text-indigo-700' : 'text-slate-700 hover:text-slate-900'}`}>
+              <button ref={element => { if (element) sectionTabRefs.current.set('all', element); else sectionTabRefs.current.delete('all') }} type="button" onClick={() => changeArea('all')} className={`relative z-10 h-8 flex-none rounded-full px-3.5 text-sm font-medium transition-colors duration-300 ${selectedAreaId === 'all' ? 'text-accent-text' : 'text-slate-700 hover:text-slate-900'}`}>
             All pages
           </button>
           {projectAreas.map(area => (
-            <div ref={element => { const key = String(area.id); if (element) sectionTabRefs.current.set(key, element); else sectionTabRefs.current.delete(key) }} key={area.id} className={`group/tab relative z-10 flex h-8 flex-none items-center rounded-full transition-colors duration-300 ${selectedAreaId === String(area.id) ? 'text-indigo-700' : 'text-slate-700 hover:text-slate-900'}`}>
+                <div ref={element => { const key = String(area.id); if (element) sectionTabRefs.current.set(key, element); else sectionTabRefs.current.delete(key) }} key={area.id} className={`group/tab relative z-10 flex h-8 flex-none items-center rounded-full transition-colors duration-300 ${selectedAreaId === String(area.id) ? 'text-accent-text' : 'text-slate-700 hover:text-slate-900'}`}>
               <button type="button" onClick={() => changeArea(String(area.id))} className="h-full max-w-[180px] truncate pl-4 pr-2 text-sm font-medium" title={area.title}>{area.title}</button>
               <button type="button" onClick={() => handleDeleteArea(area)} className="mr-1 grid h-6 w-6 place-items-center rounded-md opacity-0 transition-opacity hover:bg-slate-100 group-hover/tab:opacity-100 focus:opacity-100" title={`Delete ${area.title}`} aria-label={`Delete ${area.title}`}>
                 <X className="h-3 w-3" />
               </button>
             </div>
           ))}
-          <button ref={element => { if (element) sectionTabRefs.current.set('unfiled', element); else sectionTabRefs.current.delete('unfiled') }} type="button" onClick={() => changeArea('unfiled')} className={`relative z-10 h-8 flex-none rounded-full px-3.5 text-sm font-medium transition-colors duration-300 ${selectedAreaId === 'unfiled' ? 'text-indigo-700' : 'text-slate-700 hover:text-slate-900'}`}>
+              <button ref={element => { if (element) sectionTabRefs.current.set('unfiled', element); else sectionTabRefs.current.delete('unfiled') }} type="button" onClick={() => changeArea('unfiled')} className={`relative z-10 h-8 flex-none rounded-full px-3.5 text-sm font-medium transition-colors duration-300 ${selectedAreaId === 'unfiled' ? 'text-accent-text' : 'text-slate-700 hover:text-slate-900'}`}>
             No section
           </button>
           {selectedProject && (isAddingArea ? (
-            <div className="flex h-8 flex-none items-center rounded-full border border-indigo-200 bg-white px-1">
+                <div className="flex h-8 flex-none items-center rounded-full border border-accent-border bg-white px-1">
               <input
                 ref={areaInputRef}
                 value={newAreaTitle}
@@ -649,13 +649,13 @@ function NotesPage({ pageToOpen, onPageOpened, openTaskModal, taskRefreshTrigger
                 placeholder="Section name"
                 className="w-28 bg-transparent px-1.5 text-sm font-semibold text-slate-800 outline-none"
               />
-              <button type="button" onClick={handleCreateArea} disabled={!newAreaTitle.trim() || savingArea} className="grid h-6 w-6 place-items-center rounded-md text-indigo-600 hover:bg-indigo-50 disabled:opacity-40">
+                  <button type="button" onClick={handleCreateArea} disabled={!newAreaTitle.trim() || savingArea} className="grid h-6 w-6 place-items-center rounded-md text-accent-text hover:bg-accent-surface disabled:opacity-40">
                 {savingArea ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
               </button>
               <button type="button" onClick={() => { setIsAddingArea(false); setNewAreaTitle('') }} className="grid h-6 w-6 place-items-center rounded-md text-slate-400 hover:bg-slate-100"><X className="h-3.5 w-3.5" /></button>
             </div>
           ) : (
-            <button type="button" onClick={() => setIsAddingArea(true)} className="inline-flex h-8 flex-none items-center gap-1.5 rounded-full px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-white/70 hover:text-indigo-700">
+                <button type="button" onClick={() => setIsAddingArea(true)} className="inline-flex h-8 flex-none items-center gap-1.5 rounded-full px-3 text-sm font-medium text-slate-700 transition-colors hover:bg-white/70 hover:text-accent-text">
               <Plus className="h-3.5 w-3.5" /> Section
             </button>
           ))}
@@ -676,7 +676,7 @@ function NotesPage({ pageToOpen, onPageOpened, openTaskModal, taskRefreshTrigger
           <div className="flex h-[61px] flex-none items-center justify-between gap-2 border-b border-slate-200 bg-white px-4">
             <div className="relative w-full">
               <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-600" />
-              <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search pages" className="h-9 w-full rounded-full border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-800 outline-none focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100" />
+              <input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search pages" className="h-9 w-full rounded-full border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-800 outline-none focus:border-accent-focus focus:ring-2 focus:ring-accent-focus/30" />
             </div>
           </div>
 
@@ -690,12 +690,12 @@ function NotesPage({ pageToOpen, onPageOpened, openTaskModal, taskRefreshTrigger
                 onClick={() => selectPage(page)}
                 className={`relative flex h-11 w-full items-center gap-2 border-b border-slate-200 px-4 text-left text-sm font-medium transition-colors last:border-b-0 ${
                   selectedPageId === page.id
-                    ? 'bg-indigo-50 font-semibold text-indigo-700'
+                        ? 'bg-accent-surface font-semibold text-accent-text'
                     : 'text-slate-700 hover:bg-white/90 hover:text-slate-900'
                 }`}
                 title={page.title}
               >
-                {selectedPageId === page.id && <span className="absolute inset-y-2 left-0 w-0.5 rounded-r-full bg-indigo-500" />}
+                    {selectedPageId === page.id && <span className="absolute inset-y-2 left-0 w-0.5 rounded-r-full bg-accent-solid" />}
                 <span className="min-w-0 flex-1 truncate">{page.title}</span>
                 <span className={`inline-flex h-5 flex-none items-center rounded-full border px-2 text-[10px] font-semibold ${typeStyles[page.page_type] || typeStyles.general}`}>
                   {page.page_type === 'status_update' ? 'Update' : pageTypes.find(([value]) => value === page.page_type)?.[1] || page.page_type}
@@ -725,8 +725,8 @@ function NotesPage({ pageToOpen, onPageOpened, openTaskModal, taskRefreshTrigger
                   </div>
                   <div className="flex flex-none items-center gap-2">
                     <button type="button" onClick={handleDeletePage} className="grid h-9 w-9 place-items-center rounded-full border border-slate-200 text-slate-600 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-600" title="Delete page" aria-label="Delete page"><Trash2 className="h-4 w-4" /></button>
-                    <div ref={propertiesMenuRef} className="relative"><button type="button" onClick={() => setPropertiesMenuOpen(!propertiesMenuOpen)} className={`grid h-9 w-9 place-items-center rounded-full border transition-colors ${propertiesMenuOpen ? 'border-indigo-200 bg-indigo-50 text-indigo-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`} title="Page properties" aria-label="Page properties" aria-expanded={propertiesMenuOpen}><MoreHorizontal className="h-4 w-4" /></button>{propertiesMenuOpen && <div className="absolute right-0 top-11 z-[90] w-72 rounded-xl border border-slate-200 bg-white p-3 shadow-xl"><div className="mb-3"><p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Page type</p><Select value={draft.page_type} onChange={value => setDraft(current => ({ ...current, page_type: value }))} options={pageTypes.map(([value, label]) => ({ value, label }))} ariaLabel="Page type" /></div><div className="mb-3"><p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Project</p><Select value={draft.project_id == null ? '' : String(draft.project_id)} onChange={value => setDraft(current => ({ ...current, project_id: value ? Number(value) : null, area_id: null }))} options={[{ value: '', label: 'No project' }, ...projects.map(project => ({ value: String(project.id), label: project.title }))]} ariaLabel="Page project" menuClassName="right-0 left-auto w-full" /></div><div><p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Section</p><Select value={draft.area_id == null ? '' : String(draft.area_id)} onChange={value => setDraft(current => ({ ...current, area_id: value ? Number(value) : null }))} options={[{ value: '', label: 'No section' }, ...draftProjectAreas.map(area => ({ value: String(area.id), label: area.title }))]} ariaLabel="Page section" disabled={draft.project_id == null} menuClassName="bottom-full top-auto mb-1 mt-0 w-full" /></div></div>}</div>
-                    <button type="button" onClick={handleSavePage} disabled={!dirty || !draft.title.trim() || savingPage} className="inline-flex h-9 min-w-[88px] items-center justify-center gap-2 rounded-full bg-indigo-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40">
+                    <div ref={propertiesMenuRef} className="relative"><button type="button" onClick={() => setPropertiesMenuOpen(!propertiesMenuOpen)} className={`grid h-9 w-9 place-items-center rounded-full border transition-colors ${propertiesMenuOpen ? 'border-accent-border bg-accent-surface text-accent-text' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`} title="Page properties" aria-label="Page properties" aria-expanded={propertiesMenuOpen}><MoreHorizontal className="h-4 w-4" /></button>{propertiesMenuOpen && <div className="absolute right-0 top-11 z-[90] w-72 rounded-xl border border-slate-200 bg-white p-3 shadow-xl"><div className="mb-3"><p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Page type</p><Select value={draft.page_type} onChange={value => setDraft(current => ({ ...current, page_type: value }))} options={pageTypes.map(([value, label]) => ({ value, label }))} ariaLabel="Page type" /></div><div className="mb-3"><p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Project</p><Select value={draft.project_id == null ? '' : String(draft.project_id)} onChange={value => setDraft(current => ({ ...current, project_id: value ? Number(value) : null, area_id: null }))} options={[{ value: '', label: 'No project' }, ...projects.map(project => ({ value: String(project.id), label: project.title }))]} ariaLabel="Page project" menuClassName="right-0 left-auto w-full" /></div><div><p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Section</p><Select value={draft.area_id == null ? '' : String(draft.area_id)} onChange={value => setDraft(current => ({ ...current, area_id: value ? Number(value) : null }))} options={[{ value: '', label: 'No section' }, ...draftProjectAreas.map(area => ({ value: String(area.id), label: area.title }))]} ariaLabel="Page section" disabled={draft.project_id == null} menuClassName="bottom-full top-auto mb-1 mt-0 w-full" /></div></div>}</div>
+                    <button type="button" onClick={handleSavePage} disabled={!dirty || !draft.title.trim() || savingPage} className="inline-flex h-9 min-w-[88px] items-center justify-center gap-2 rounded-full bg-accent-solid px-4 text-sm font-semibold text-accent-foreground transition-colors hover:bg-accent-solid-hover disabled:cursor-not-allowed disabled:opacity-40">
                       {savingPage ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
                       Save
                     </button>
@@ -745,12 +745,12 @@ function NotesPage({ pageToOpen, onPageOpened, openTaskModal, taskRefreshTrigger
                     role="tab"
                     aria-selected={pageView === value}
                     onClick={() => setPageView(value)}
-                    className={`relative inline-flex h-12 items-center gap-2 px-3 text-sm font-medium transition-colors ${pageView === value ? 'text-indigo-700' : 'text-slate-700 hover:text-slate-900'}`}
+                        className={`relative inline-flex h-12 items-center gap-2 px-3 text-sm font-medium transition-colors ${pageView === value ? 'text-accent-text' : 'text-slate-700 hover:text-slate-900'}`}
                   >
                     <Icon className="h-4 w-4" />
                     {label}
-                    {count !== null && <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${pageView === value ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-700'}`}>{count}</span>}
-                    {pageView === value && <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-indigo-500" />}
+                        {count !== null && <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${pageView === value ? 'bg-accent-muted text-accent-text' : 'bg-slate-100 text-slate-700'}`}>{count}</span>}
+                        {pageView === value && <span className="absolute inset-x-2 bottom-0 h-0.5 rounded-full bg-accent-solid" />}
                   </button>
                 ))}
               </div>
@@ -774,13 +774,13 @@ function NotesPage({ pageToOpen, onPageOpened, openTaskModal, taskRefreshTrigger
                       </button>
                     </div>
                     {showTaskPicker && <div className="border-b border-slate-200 bg-slate-50 p-3">
-                      <input value={taskSearch} onChange={event => setTaskSearch(event.target.value)} placeholder="Search existing tasks" autoFocus className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-indigo-400" />
+                            <input value={taskSearch} onChange={event => setTaskSearch(event.target.value)} placeholder="Search existing tasks" autoFocus className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-accent-focus" />
                       <div className="mt-2 max-h-48 overflow-y-auto no-scrollbar">
-                        {tasksLoading ? <p className="px-2 py-2 text-xs text-slate-500">Loading tasks…</p> : linkCandidates.length ? linkCandidates.map(task => <button key={task.id} type="button" disabled={taskActionBusy} onClick={() => linkExistingTask(task)} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm text-slate-700 hover:bg-indigo-50 disabled:opacity-50"><Plus className="h-3.5 w-3.5 text-indigo-600" /><span className="truncate">{task.title}</span></button>) : <p className="px-2 py-2 text-xs text-slate-500">No available tasks</p>}
+                              {tasksLoading ? <p className="px-2 py-2 text-xs text-slate-500">Loading tasks…</p> : linkCandidates.length ? linkCandidates.map(task => <button key={task.id} type="button" disabled={taskActionBusy} onClick={() => linkExistingTask(task)} className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm text-slate-700 hover:bg-accent-surface disabled:opacity-50"><Plus className="h-3.5 w-3.5 text-accent-text" /><span className="truncate">{task.title}</span></button>) : <p className="px-2 py-2 text-xs text-slate-500">No available tasks</p>}
                       </div>
                     </div>}
                     <div className="flex items-center gap-2 border-b border-slate-200 bg-sky-50/70 px-4 py-3">
-                      <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-indigo-100 text-indigo-700"><Plus className="h-4 w-4" /></span>
+                        <span className="grid h-7 w-7 flex-none place-items-center rounded-full bg-accent-muted text-accent-text"><Plus className="h-4 w-4" /></span>
                       <input
                         value={newTaskTitle}
                         onChange={event => setNewTaskTitle(event.target.value)}
@@ -788,7 +788,7 @@ function NotesPage({ pageToOpen, onPageOpened, openTaskModal, taskRefreshTrigger
                         placeholder="Add a task to this page…"
                         className="min-w-0 flex-1 bg-transparent text-sm font-medium text-slate-800 outline-none placeholder:text-slate-400"
                       />
-                      <button type="button" onClick={addPageTask} disabled={!newTaskTitle.trim() || taskActionBusy} className="h-8 rounded-full border border-indigo-200 bg-indigo-50 px-4 text-xs font-semibold text-indigo-700 transition-colors hover:bg-indigo-100 disabled:opacity-40">{taskActionBusy ? 'Adding…' : 'Add'}</button>
+                        <button type="button" onClick={addPageTask} disabled={!newTaskTitle.trim() || taskActionBusy} className="h-8 rounded-full border border-accent-border bg-accent-surface px-4 text-xs font-semibold text-accent-text transition-colors hover:bg-accent-surface-hover disabled:opacity-40">{taskActionBusy ? 'Adding…' : 'Add'}</button>
                     </div>
                     <div>
                       {linksLoading || tasksLoading ? <p className="px-4 py-6 text-center text-sm text-slate-500">Loading linked tasks…</p> : linkedTasks.length ? linkedTasks.map(task => (
@@ -802,7 +802,7 @@ function NotesPage({ pageToOpen, onPageOpened, openTaskModal, taskRefreshTrigger
                           >
                             {task.status === 'completed' && <Check className="h-3 w-3" strokeWidth={3} />}
                           </button>
-                          <button type="button" onClick={() => openTaskModal?.(task, 'edit')} className={`min-w-0 flex-1 truncate text-left text-sm font-semibold hover:text-indigo-700 ${task.status === 'completed' ? 'text-slate-400 line-through' : 'text-slate-800'}`}>{task.title}</button>
+                              <button type="button" onClick={() => openTaskModal?.(task, 'edit')} className={`min-w-0 flex-1 truncate text-left text-sm font-semibold hover:text-accent-text ${task.status === 'completed' ? 'text-slate-400 line-through' : 'text-slate-800'}`}>{task.title}</button>
                           <span className={`inline-flex h-6 flex-none items-center rounded-full border px-2.5 text-[11px] font-semibold ${task.status === 'completed' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : task.status === 'in_progress' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-blue-200 bg-blue-50 text-blue-700'}`}>
                             {task.status === 'completed' ? 'Completed' : task.status === 'in_progress' ? 'In Progress' : 'To Do'}
                           </span>
@@ -829,7 +829,7 @@ function NotesPage({ pageToOpen, onPageOpened, openTaskModal, taskRefreshTrigger
                         <div className="space-y-5 pb-4">
                           {updates.map(item => (
                             <article key={item.id} className="group flex items-start gap-3">
-                              <span className="grid h-8 w-8 flex-none place-items-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">U</span>
+                            <span className="grid h-8 w-8 flex-none place-items-center rounded-full bg-accent-muted text-xs font-bold text-accent-text">U</span>
                               <div className="min-w-0 flex-1">
                                 <div className="mb-1.5 flex items-center gap-2 text-xs text-slate-500">
                                   <span className="font-semibold text-slate-800">Update</span>
@@ -837,10 +837,10 @@ function NotesPage({ pageToOpen, onPageOpened, openTaskModal, taskRefreshTrigger
                                   {item.updated_at !== item.created_at && <span>· Edited</span>}
                                 </div>
                                 <div className="rounded-2xl rounded-tl-md border border-slate-200 bg-white px-4 py-3 shadow-sm">
-                                  <div className="prose prose-sm max-w-none break-words text-slate-800 prose-p:my-1 prose-a:text-indigo-600 prose-a:underline prose-img:max-w-full prose-img:rounded-lg" dangerouslySetInnerHTML={{ __html: sanitizeUpdateHtml(item.content) }} />
+                              <div className="prose prose-sm max-w-none break-words text-slate-800 prose-p:my-1 prose-a:text-accent-text prose-a:underline prose-img:max-w-full prose-img:rounded-lg" dangerouslySetInnerHTML={{ __html: sanitizeUpdateHtml(item.content) }} />
                                 </div>
                                 <div className="mt-1 flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-                                  <button type="button" onClick={() => startEditingUpdate(item)} disabled={updateBusy} className="inline-flex items-center gap-1 rounded-md px-1 py-0.5 text-xs text-slate-500 hover:text-indigo-700 disabled:opacity-40" title="Edit update"><Pencil className="h-3 w-3" /> Edit</button>
+                                <button type="button" onClick={() => startEditingUpdate(item)} disabled={updateBusy} className="inline-flex items-center gap-1 rounded-md px-1 py-0.5 text-xs text-slate-500 hover:text-accent-text disabled:opacity-40" title="Edit update"><Pencil className="h-3 w-3" /> Edit</button>
                                   <button type="button" onClick={() => removeUpdate(item)} disabled={updateBusy} className="inline-flex items-center gap-1 rounded-md px-1 py-0.5 text-xs text-slate-500 hover:text-red-600 disabled:opacity-40" title="Delete update"><Trash2 className="h-3 w-3" /> Delete</button>
                                 </div>
                               </div>
@@ -849,7 +849,7 @@ function NotesPage({ pageToOpen, onPageOpened, openTaskModal, taskRefreshTrigger
                         </div>
                       ) : (
                         <div className="flex min-h-48 flex-col items-center justify-center text-center">
-                          <span className="grid h-11 w-11 place-items-center rounded-full bg-indigo-50 text-indigo-500"><MessageSquareText className="h-5 w-5" /></span>
+                        <span className="grid h-11 w-11 place-items-center rounded-full bg-accent-surface text-accent-text"><MessageSquareText className="h-5 w-5" /></span>
                           <p className="mt-3 text-sm font-semibold text-slate-700">No updates yet</p>
                           <p className="mt-1 text-xs text-slate-500">Start the conversation about this page below.</p>
                         </div>
@@ -858,13 +858,13 @@ function NotesPage({ pageToOpen, onPageOpened, openTaskModal, taskRefreshTrigger
                   </div>
                   <div className="flex-none border-t border-slate-200 bg-white px-5 py-3">
                     <div className="mx-auto max-w-3xl">
-                      {editingUpdateId && <div className="mb-2 flex items-center justify-between text-xs font-medium text-indigo-700"><span>Editing update</span><button type="button" onClick={stopEditingUpdate} className="text-slate-500 hover:text-slate-800">Cancel edit</button></div>}
-                      <div className="overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-sm transition-colors focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100" onKeyDownCapture={event => { if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); saveUpdate() } }}>
+                  {editingUpdateId && <div className="mb-2 flex items-center justify-between text-xs font-medium text-accent-text"><span>Editing update</span><button type="button" onClick={stopEditingUpdate} className="text-slate-500 hover:text-slate-800">Cancel edit</button></div>}
+                  <div className="overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-sm transition-colors focus-within:border-accent-focus focus-within:ring-2 focus-within:ring-accent-focus/30" onKeyDownCapture={event => { if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); saveUpdate() } }}>
                         <TipTapEditor key={`${selectedPage.id}-${editingUpdateId || 'new'}`} content={updateDraft} onChange={setUpdateDraft} compact maxImageBytes={5 * 1024 * 1024} onImageError={setUpdateError} />
                       </div>
                       <div className="mt-2 flex items-center justify-between gap-3">
                         <p className={`min-w-0 text-xs ${updateError ? 'text-red-600' : 'text-slate-400'}`}>{updateError || 'Enter for a new line · Ctrl+Enter to post · Images up to 5 MB'}</p>
-                        <button type="button" onClick={saveUpdate} disabled={updateBusy || !hasUpdateContent(updateDraft)} className="inline-flex h-8 flex-none items-center gap-1.5 rounded-full bg-indigo-600 px-4 text-xs font-semibold text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-40"><Send className="h-3.5 w-3.5" />{updateBusy ? 'Saving…' : editingUpdateId ? 'Save changes' : 'Post update'}</button>
+                      <button type="button" onClick={saveUpdate} disabled={updateBusy || !hasUpdateContent(updateDraft)} className="inline-flex h-8 flex-none items-center gap-1.5 rounded-full bg-accent-solid px-4 text-xs font-semibold text-accent-foreground transition-colors hover:bg-accent-solid-hover disabled:cursor-not-allowed disabled:opacity-40"><Send className="h-3.5 w-3.5" />{updateBusy ? 'Saving…' : editingUpdateId ? 'Save changes' : 'Post update'}</button>
                       </div>
                     </div>
                   </div>

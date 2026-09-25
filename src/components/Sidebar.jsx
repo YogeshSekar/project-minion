@@ -46,9 +46,9 @@ export default function Sidebar({
                 className={`
                   w-full flex h-10 items-center justify-center rounded-xl
                   text-sm font-medium transition-all duration-200 ease-out
-                  group relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900
+                group relative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-focus focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900
                   ${isActive
-                    ? 'bg-indigo-500 text-white'
+                    ? 'bg-accent-solid text-accent-foreground'
                     : 'text-slate-300 hover:bg-slate-800 hover:text-white'
                   }
                 `}
@@ -66,7 +66,7 @@ export default function Sidebar({
       {/* Bottom Icons */}
       <div className="space-y-1.5 border-t border-slate-800 px-2 pb-3 pt-3">
         <button
-          className="flex h-10 w-full items-center justify-center rounded-xl text-slate-300 transition-colors hover:bg-slate-800 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
+            className="flex h-10 w-full items-center justify-center rounded-xl text-slate-300 transition-colors hover:bg-slate-800 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-focus"
           title="Notifications"
           aria-label="Notifications"
         >
@@ -74,7 +74,7 @@ export default function Sidebar({
         </button>
         <button
           onClick={onSettingsClick}
-          className="flex h-10 w-full items-center justify-center rounded-xl text-slate-300 transition-colors hover:bg-slate-800 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
+            className="flex h-10 w-full items-center justify-center rounded-xl text-slate-300 transition-colors hover:bg-slate-800 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-focus"
           title="Settings"
           aria-label="Settings"
         >

@@ -53,7 +53,7 @@ function DateTimePicker({ value, onChange, onClose, position = null }) {
     >
       <div className="grid grid-cols-3 gap-1.5 border-b border-slate-100 pb-3">
         {[[today, 'Today', CalendarDays], [tomorrow, 'Tomorrow', Clock3], [nextWeek, 'Next week', ChevronRight]].map(([date, label, Icon]) => (
-          <button key={label} type="button" onClick={() => choose(date)} className="flex h-8 items-center justify-center gap-1 rounded-full border border-indigo-100 bg-indigo-50 px-2 text-[11px] font-semibold text-indigo-700 transition-colors hover:bg-indigo-100"><Icon className="h-3.5 w-3.5" />{label}</button>
+          <button key={label} type="button" onClick={() => choose(date)} className="flex h-8 items-center justify-center gap-1 rounded-full border border-accent-border bg-accent-surface px-2 text-[11px] font-semibold text-accent-text transition-colors hover:bg-accent-surface-hover"><Icon className="h-3.5 w-3.5" />{label}</button>
         ))}
       </div>
 
@@ -65,7 +65,7 @@ function DateTimePicker({ value, onChange, onClose, position = null }) {
 
       <div className="mb-1 grid grid-cols-7 gap-1">{weekDays.map(day => <span key={day} className="py-1 text-center text-[10px] font-semibold uppercase text-slate-400">{day}</span>)}</div>
       <div className="grid grid-cols-7 gap-1">
-        {calendarDays.map((date, index) => <button key={date ? toLocalDateValue(date) : `empty-${index}`} type="button" disabled={!date} onClick={() => date && choose(date)} className={`grid h-8 w-8 place-items-center rounded-full text-xs font-medium transition-colors ${!date ? 'invisible' : sameDay(date, parsedValue) ? 'bg-indigo-600 font-semibold text-white' : sameDay(date, today) ? 'bg-indigo-50 font-semibold text-indigo-700 ring-1 ring-indigo-200' : 'text-slate-700 hover:bg-slate-100'}`}>{date?.getDate()}</button>)}
+          {calendarDays.map((date, index) => <button key={date ? toLocalDateValue(date) : `empty-${index}`} type="button" disabled={!date} onClick={() => date && choose(date)} className={`grid h-8 w-8 place-items-center rounded-full text-xs font-medium transition-colors ${!date ? 'invisible' : sameDay(date, parsedValue) ? 'bg-accent-solid font-semibold text-accent-foreground' : sameDay(date, today) ? 'bg-accent-surface font-semibold text-accent-text ring-1 ring-accent-border' : 'text-slate-700 hover:bg-slate-100'}`}>{date?.getDate()}</button>)}
       </div>
 
       <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">

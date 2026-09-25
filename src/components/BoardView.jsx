@@ -131,11 +131,11 @@ function useCustomDragDrop(onDrop) {
 
 
 const columnHeaderMap = {
-  todo: { icon: ListTodo, iconColor: 'text-sky-600', count: 'bg-sky-100 text-sky-700' },
-  in_progress: { icon: PlayCircle, iconColor: 'text-amber-600', count: 'bg-amber-100 text-amber-700' },
-  waiting: { icon: PauseCircle, iconColor: 'text-violet-600', count: 'bg-violet-100 text-violet-700' },
-  completed: { icon: CheckCircle2, iconColor: 'text-emerald-600', count: 'bg-emerald-100 text-emerald-700' },
-  default: { icon: ListTodo, iconColor: 'text-slate-500', count: 'bg-slate-100 text-slate-600' },
+  todo: { icon: ListTodo, iconColor: 'text-sky-600 dark:text-sky-400', count: 'bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300' },
+  in_progress: { icon: PlayCircle, iconColor: 'text-amber-600 dark:text-amber-400', count: 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300' },
+  waiting: { icon: PauseCircle, iconColor: 'text-violet-600 dark:text-violet-400', count: 'bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300' },
+  completed: { icon: CheckCircle2, iconColor: 'text-emerald-600 dark:text-emerald-400', count: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' },
+  default: { icon: ListTodo, iconColor: 'text-slate-500 dark:text-slate-400', count: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300' },
 };
 
 const columnDropTargetMap = {
@@ -184,7 +184,7 @@ function BoardColumn({ title, columnId, tasks, projects, isDropTarget, onMouseEn
       onMouseEnter={() => onMouseEnter(columnId)}
       onMouseLeave={onMouseLeave}
       className={`
-        flex min-w-[260px] w-full flex-col border-r border-slate-200 bg-transparent px-3 transition-all duration-200
+        flex min-w-[260px] w-full flex-col border-r border-slate-200 bg-transparent px-3 transition-all duration-200 dark:border-slate-800
         ${isDropTarget
           ? `${dropTargetClass} rounded-xl border ring-2 ring-inset shadow-sm`
           : ''
@@ -193,7 +193,7 @@ function BoardColumn({ title, columnId, tasks, projects, isDropTarget, onMouseEn
     >
       <div className="mb-3 flex items-center gap-2">
         <ColumnIcon className={`h-5 w-5 ${headerStyle.iconColor}`} />
-        <h3 className="font-semibold text-gray-900">
+        <h3 className="font-semibold text-gray-900 dark:text-slate-100">
           {title}
         </h3>
         {tasks.length > 0 && (
@@ -211,7 +211,7 @@ function BoardColumn({ title, columnId, tasks, projects, isDropTarget, onMouseEn
             type="button"
             onClick={openQuickAdd}
             disabled={quickAddSaving || quickAddOpen}
-            className={`grid h-7 w-7 place-items-center rounded-full transition-colors hover:bg-white hover:shadow-sm disabled:cursor-wait disabled:opacity-50 ${headerStyle.iconColor}`}
+            className={`grid h-7 w-7 place-items-center rounded-full transition-colors hover:bg-white hover:shadow-sm dark:hover:bg-slate-800 disabled:cursor-wait disabled:opacity-50 ${headerStyle.iconColor}`}
             title={`Add task to ${title}`}
             aria-label={`Add task to ${title}`}
           >
@@ -241,7 +241,7 @@ function BoardColumn({ title, columnId, tasks, projects, isDropTarget, onMouseEn
             flex h-24 items-center justify-center rounded-xl border-2 border-dashed text-sm
             ${isDropTarget 
               ? 'border-current bg-white/70 font-semibold text-slate-700' 
-              : 'border-gray-200 text-gray-400'
+              : 'border-gray-200 text-gray-400 dark:border-slate-800 dark:text-slate-600'
             }
           `}>
             {isDropTarget ? 'Release to move task' : 'No tasks'}

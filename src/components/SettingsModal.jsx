@@ -6,6 +6,7 @@ import { isPermissionGranted, requestPermission } from '@tauri-apps/plugin-notif
 import { getAutoStart, setAutoStart } from '../services/autoStartService'
 import { loadNotificationPreferences, saveNotificationPreferences as persistNotificationPreferences, sendTestNotification } from '../services/notificationService'
 import { createBackup, loadBackupPreferences, saveBackupPreferences } from '../services/backupService'
+import { ACCENT_THEMES } from '../config/accentThemes'
 
 const fonts = [
   { id: 'inter', name: 'Inter', family: "'Inter', system-ui, sans-serif" },
@@ -31,7 +32,7 @@ const settingsCategories = [
 
 function Toggle({ checked, onChange, disabled = false, label }) {
   return (
-    <button type="button" role="switch" aria-checked={checked} aria-label={label} onClick={onChange} disabled={disabled} className={`relative inline-flex h-6 w-11 flex-none rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-50 ${checked ? 'bg-indigo-600' : 'bg-slate-300 dark:bg-slate-600'}`}>
+    <button type="button" role="switch" aria-checked={checked} aria-label={label} onClick={onChange} disabled={disabled} className={`relative inline-flex h-6 w-11 flex-none rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-focus focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-50 ${checked ? 'bg-accent-solid' : 'bg-slate-300 dark:bg-slate-600'}`}>
       <span className={`mt-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${checked ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
     </button>
   )
@@ -40,7 +41,7 @@ function Toggle({ checked, onChange, disabled = false, label }) {
 function SectionTitle({ icon: Icon, title, description }) {
   return (
     <div className="mb-3 flex items-start gap-3">
-      <span className="grid h-8 w-8 flex-none place-items-center rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-950/50 dark:text-indigo-300"><Icon className="h-4 w-4" /></span>
+      <span className="grid h-8 w-8 flex-none place-items-center rounded-lg bg-accent-surface text-accent-text"><Icon className="h-4 w-4" /></span>
       <div>
         <h3 className="text-sm font-semibold text-slate-900 dark:text-white">{title}</h3>
         {description && <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{description}</p>}
@@ -49,7 +50,7 @@ function SectionTitle({ icon: Icon, title, description }) {
   )
 }
 
-export default function SettingsModal({ isOpen, onClose, theme, setTheme, font, setFont }) {
+export default function SettingsModal({ isOpen, onClose, theme, setTheme, font, setFont, accent, setAccent }) {
   const [autoStart, setAutoStartState] = useState(false)
   const [autoStartLoading, setAutoStartLoading] = useState(true)
   const [autoStartError, setAutoStartError] = useState('')
@@ -237,7 +238,7 @@ export default function SettingsModal({ isOpen, onClose, theme, setTheme, font, 
         <div className="flex min-h-0 flex-1">
           <aside className="w-52 flex-none border-r border-slate-200 bg-slate-50/80 p-3 dark:border-slate-700 dark:bg-slate-950/30">
             <nav className="space-y-1" aria-label="Settings categories">
-              {settingsCategories.map(([id, label, Icon]) => <button key={id} type="button" onClick={() => setActiveSettingsSection(id)} className={`flex h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-medium transition-colors ${activeSettingsSection === id ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200 dark:bg-slate-800 dark:text-indigo-300 dark:ring-slate-700' : 'text-slate-600 hover:bg-white/80 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'}`}><Icon className="h-4 w-4 flex-none" />{label}</button>)}
+              {settingsCategories.map(([id, label, Icon]) => <button key={id} type="button" onClick={() => setActiveSettingsSection(id)} className={`flex h-10 w-full items-center gap-3 rounded-lg px-3 text-left text-sm font-medium transition-colors ${activeSettingsSection === id ? 'bg-accent-surface text-accent-text shadow-sm ring-1 ring-accent-border' : 'text-slate-600 hover:bg-white/80 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white'}`}><Icon className="h-4 w-4 flex-none" />{label}</button>)}
             </nav>
           </aside>
 
@@ -246,14 +247,42 @@ export default function SettingsModal({ isOpen, onClose, theme, setTheme, font, 
             <SectionTitle icon={Palette} title="Appearance" description="Choose how the application looks on this device." />
             <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
               <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-4 py-3 dark:border-slate-700">
-                <div><p className="text-sm font-medium text-slate-800 dark:text-slate-200">Color theme</p><p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Use a light, dark, or system-matched interface.</p></div>
+                <div><p className="text-sm font-medium text-slate-800 dark:text-slate-200">Appearance mode</p><p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Use a light, dark, or system-matched interface.</p></div>
                 <div className="flex rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
-                  {themes.map(({ id, label, icon: Icon }) => <button key={id} type="button" onClick={() => setTheme(id)} title={label} aria-label={`${label} theme`} className={`inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold transition-colors ${theme === id ? 'bg-white text-indigo-700 shadow-sm dark:bg-slate-700 dark:text-indigo-300' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'}`}><Icon className="h-3.5 w-3.5" /><span className="hidden sm:inline">{label}</span></button>)}
+                  {themes.map(({ id, label, icon: Icon }) => <button key={id} type="button" onClick={() => setTheme(id)} title={label} aria-label={`${label} theme`} className={`inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-xs font-semibold transition-colors ${theme === id ? 'bg-accent-surface text-accent-text shadow-sm ring-1 ring-accent-border' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'}`}><Icon className="h-3.5 w-3.5" /><span className="hidden sm:inline">{label}</span></button>)}
+                </div>
+              </div>
+              <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-4 py-3 dark:border-slate-700">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-slate-800 dark:text-slate-200">Accent color</p>
+                  <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Choose the color used for actions, selections, and highlights.</p>
+                </div>
+                <div className="grid flex-none grid-cols-4 gap-2" role="radiogroup" aria-label="Accent color">
+                  {ACCENT_THEMES.map(item => {
+                    const selected = accent === item.id
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={selected}
+                        aria-label={`${item.label} accent`}
+                        title={`${item.label} accent`}
+                        onClick={() => setAccent(item.id)}
+                        className={`inline-flex min-w-[70px] flex-col items-center gap-1.5 rounded-lg border px-2 py-2 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-focus focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900 ${selected ? 'border-accent-border bg-accent-surface text-accent-text ring-1 ring-accent-border' : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-slate-600 dark:hover:bg-slate-700'}`}
+                      >
+                        <span className="relative h-5 w-5 rounded-full ring-1 ring-black/10 dark:ring-white/20" style={{ backgroundColor: item.preview }} aria-hidden="true">
+                          {selected && <span className="absolute inset-0 grid place-items-center text-[11px] font-bold leading-none text-white">✓</span>}
+                        </span>
+                        <span>{item.label}</span>
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
               <div className="flex items-center justify-between gap-4 px-4 py-3">
                 <div><p className="text-sm font-medium text-slate-800 dark:text-slate-200">Interface font</p><p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Choose the typeface used throughout the app.</p></div>
-                <select value={font} onChange={event => setFont(event.target.value)} className="h-9 w-40 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none transition-colors focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:focus:ring-indigo-900">
+                <select value={font} onChange={event => setFont(event.target.value)} className="h-9 w-40 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none transition-colors focus:border-accent-focus focus:ring-2 focus:ring-accent-focus/30 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
                   {fonts.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
                 </select>
               </div>
@@ -266,7 +295,7 @@ export default function SettingsModal({ isOpen, onClose, theme, setTheme, font, 
               <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-4 py-3 dark:border-slate-700">
                 <div><p className="text-sm font-medium text-slate-800 dark:text-slate-200">Preferred view</p><p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Your selection is remembered between sessions.</p></div>
                 <div className="flex rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
-                  {[['board', 'Board', LayoutGrid], ['list', 'List', List]].map(([value, label, Icon]) => <button key={value} type="button" onClick={() => selectTaskView(value)} className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition-colors ${taskView === value ? 'bg-white text-indigo-700 shadow-sm dark:bg-slate-700 dark:text-indigo-300' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'}`}><Icon className="h-3.5 w-3.5" />{label}</button>)}
+                  {[['board', 'Board', LayoutGrid], ['list', 'List', List]].map(([value, label, Icon]) => <button key={value} type="button" onClick={() => selectTaskView(value)} className={`inline-flex h-8 items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition-colors ${taskView === value ? 'bg-accent-surface text-accent-text shadow-sm ring-1 ring-accent-border' : 'text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white'}`}><Icon className="h-3.5 w-3.5" />{label}</button>)}
                 </div>
               </div>
               <div className="flex items-center justify-between gap-4 px-4 py-3">
@@ -294,7 +323,7 @@ export default function SettingsModal({ isOpen, onClose, theme, setTheme, font, 
                     <div><p className="text-sm font-medium text-slate-800 dark:text-slate-200">{title}</p><p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{description}</p></div>
                   </div>
                   <div className="ml-11 flex items-center gap-3 sm:ml-0">
-                    <input type="time" value={notificationPreferences[key].time} onChange={event => updateNotificationSchedule(key, { time: event.target.value })} disabled={!notificationPreferences.enabled || !notificationPreferences[key].enabled} aria-label={`${title} time`} className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-sm font-medium text-slate-700 outline-none transition-colors focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:focus:ring-indigo-900" />
+                  <input type="time" value={notificationPreferences[key].time} onChange={event => updateNotificationSchedule(key, { time: event.target.value })} disabled={!notificationPreferences.enabled || !notificationPreferences[key].enabled} aria-label={`${title} time`} className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-sm font-medium text-slate-700 outline-none transition-colors focus:border-accent-focus focus:ring-2 focus:ring-accent-focus/30 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200" />
                     <Toggle checked={notificationPreferences[key].enabled} onChange={() => updateNotificationSchedule(key, { enabled: !notificationPreferences[key].enabled })} disabled={!notificationPreferences.enabled} label={`${title} reminder`} />
                   </div>
                 </div>
@@ -306,10 +335,10 @@ export default function SettingsModal({ isOpen, onClose, theme, setTheme, font, 
                   <div><p className="text-sm font-medium text-slate-800 dark:text-slate-200">Weekly review</p><p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Reflect on the week and prepare the next one.</p></div>
                 </div>
                 <div className="ml-11 flex flex-wrap items-center gap-2 sm:ml-0">
-                  <select value={notificationPreferences.weeklyReview.day} onChange={event => updateNotificationSchedule('weeklyReview', { day: event.target.value })} disabled={!notificationPreferences.enabled || !notificationPreferences.weeklyReview.enabled} aria-label="Weekly review day" className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-sm font-medium capitalize text-slate-700 outline-none transition-colors focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:focus:ring-indigo-900">
+                  <select value={notificationPreferences.weeklyReview.day} onChange={event => updateNotificationSchedule('weeklyReview', { day: event.target.value })} disabled={!notificationPreferences.enabled || !notificationPreferences.weeklyReview.enabled} aria-label="Weekly review day" className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-sm font-medium capitalize text-slate-700 outline-none transition-colors focus:border-accent-focus focus:ring-2 focus:ring-accent-focus/30 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
                     {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map(day => <option key={day} value={day}>{day.charAt(0).toUpperCase() + day.slice(1)}</option>)}
                   </select>
-                  <input type="time" value={notificationPreferences.weeklyReview.time} onChange={event => updateNotificationSchedule('weeklyReview', { time: event.target.value })} disabled={!notificationPreferences.enabled || !notificationPreferences.weeklyReview.enabled} aria-label="Weekly review time" className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-sm font-medium text-slate-700 outline-none transition-colors focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:focus:ring-indigo-900" />
+                  <input type="time" value={notificationPreferences.weeklyReview.time} onChange={event => updateNotificationSchedule('weeklyReview', { time: event.target.value })} disabled={!notificationPreferences.enabled || !notificationPreferences.weeklyReview.enabled} aria-label="Weekly review time" className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-sm font-medium text-slate-700 outline-none transition-colors focus:border-accent-focus focus:ring-2 focus:ring-accent-focus/30 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200" />
                   <Toggle checked={notificationPreferences.weeklyReview.enabled} onChange={() => updateNotificationSchedule('weeklyReview', { enabled: !notificationPreferences.weeklyReview.enabled })} disabled={!notificationPreferences.enabled} label="Weekly review reminder" />
                 </div>
               </div>
@@ -318,7 +347,7 @@ export default function SettingsModal({ isOpen, onClose, theme, setTheme, font, 
                   <span className="grid h-8 w-8 flex-none place-items-center rounded-lg bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-300"><BellRing className="h-4 w-4" /></span>
                   <div><p className="text-sm font-medium text-slate-800 dark:text-slate-200">Test notification</p><p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Preview a reminder using your current task data.</p></div>
                 </div>
-                <button type="button" onClick={handleTestNotification} disabled={!notificationPreferences.enabled || notificationTestState === 'sending'} className="h-9 flex-none rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 transition-colors hover:border-indigo-300 hover:text-indigo-700 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:border-indigo-500 dark:hover:text-indigo-300">
+                <button type="button" onClick={handleTestNotification} disabled={!notificationPreferences.enabled || notificationTestState === 'sending'} className="h-9 flex-none rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 transition-colors hover:border-accent-border hover:text-accent-text disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
                   {notificationTestState === 'sending' ? 'Sending…' : notificationTestState === 'sent' ? 'Sent' : 'Send test'}
                 </button>
               </div>
@@ -331,15 +360,15 @@ export default function SettingsModal({ isOpen, onClose, theme, setTheme, font, 
             <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700">
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-700">
                 <div className="min-w-0 flex-1"><p className="text-sm font-medium text-slate-800 dark:text-slate-200">Backup location</p><p className="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400" title={backupPreferences.location}>{backupPreferences.location || 'No folder selected'}</p></div>
-                <button type="button" onClick={chooseBackupLocation} className="inline-flex h-9 flex-none items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 transition-colors hover:border-indigo-300 hover:text-indigo-700 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"><FolderOpen className="h-4 w-4" />Choose folder</button>
+                <button type="button" onClick={chooseBackupLocation} className="inline-flex h-9 flex-none items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 transition-colors hover:border-accent-border hover:text-accent-text dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"><FolderOpen className="h-4 w-4" />Choose folder</button>
               </div>
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-700">
                 <div><p className="text-sm font-medium text-slate-800 dark:text-slate-200">Automatic backup</p><p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Runs when the app is open and the selected interval is due.</p></div>
-                <select value={backupPreferences.schedule} onChange={event => updateBackupSchedule(event.target.value)} disabled={!backupPreferences.location} className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"><option value="off">Off</option><option value="daily">Daily</option><option value="weekly">Weekly</option></select>
+                <select value={backupPreferences.schedule} onChange={event => updateBackupSchedule(event.target.value)} disabled={!backupPreferences.location} className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 outline-none focus:border-accent-focus focus:ring-2 focus:ring-accent-focus/30 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"><option value="off">Off</option><option value="daily">Daily</option><option value="weekly">Weekly</option></select>
               </div>
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-700">
                 <div><p className="text-sm font-medium text-slate-800 dark:text-slate-200">Manual backup</p><p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{backupPreferences.lastBackupAt ? `Last backup ${new Date(backupPreferences.lastBackupAt).toLocaleString()}` : 'No backup has been created yet.'}</p>{backupMessage && <p className={`mt-1 text-xs font-medium ${backupState === 'error' || deleteState === 'error' ? 'text-red-600' : 'text-emerald-600'}`}>{backupMessage}</p>}</div>
-                <button type="button" onClick={handleBackupNow} disabled={!backupPreferences.location || backupState === 'running'} className="inline-flex h-9 flex-none items-center gap-2 rounded-lg bg-indigo-600 px-3 text-xs font-semibold text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50">{backupState === 'running' ? <Loader2 className="h-4 w-4 animate-spin" /> : <HardDriveDownload className="h-4 w-4" />}Back up now</button>
+                <button type="button" onClick={handleBackupNow} disabled={!backupPreferences.location || backupState === 'running'} className="inline-flex h-9 flex-none items-center gap-2 rounded-lg bg-accent-solid px-3 text-xs font-semibold text-accent-foreground transition-colors hover:bg-accent-solid-hover disabled:cursor-not-allowed disabled:opacity-50">{backupState === 'running' ? <Loader2 className="h-4 w-4 animate-spin" /> : <HardDriveDownload className="h-4 w-4" />}Back up now</button>
               </div>
               <div className="bg-red-50/60 px-4 py-3 dark:bg-red-950/20">
                 <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-sm font-medium text-red-800 dark:text-red-300">Delete all data</p><p className="mt-0.5 text-xs text-red-600/80 dark:text-red-400">Permanently removes projects, tasks, pages, meetings, and activity history.</p></div><button type="button" onClick={() => setShowDeleteConfirmation(value => !value)} className="inline-flex h-9 items-center gap-2 rounded-lg border border-red-200 bg-white px-3 text-xs font-semibold text-red-700 hover:bg-red-50 dark:border-red-900 dark:bg-slate-900 dark:text-red-300"><Trash2 className="h-4 w-4" />Delete all data</button></div>

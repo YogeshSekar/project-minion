@@ -58,8 +58,8 @@ function DatePickerField({ value, onChange, placeholder = 'Select date', ariaLab
 
   return (
     <>
-      <button ref={triggerRef} type="button" onClick={togglePicker} aria-label={ariaLabel} aria-expanded={open} className={`${compact ? 'h-7 px-2.5 text-xs' : 'h-9 px-3 text-sm'} inline-flex min-w-0 items-center gap-1.5 rounded-full border transition-colors ${open ? 'border-indigo-300 bg-indigo-50 text-indigo-700 ring-2 ring-indigo-100' : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:bg-indigo-50/50'} ${className}`}>
-        <CalendarDays className="h-3.5 w-3.5 flex-none text-indigo-600" />
+      <button ref={triggerRef} type="button" onClick={togglePicker} aria-label={ariaLabel} aria-expanded={open} className={`${compact ? 'h-7 px-2.5 text-xs' : 'h-9 px-3 text-sm'} inline-flex min-w-0 items-center gap-1.5 rounded-full border transition-colors ${open ? 'border-accent-focus bg-accent-surface text-accent-text ring-2 ring-accent-focus/30' : 'border-slate-200 bg-white text-slate-700 hover:border-accent-border hover:bg-accent-surface/50'} ${className}`}>
+        <CalendarDays className="h-3.5 w-3.5 flex-none text-accent-text" />
         <span className="truncate font-semibold">{formatLocalDate(value) || placeholder}</span>
       </button>
       {open && createPortal(<DateTimePicker value={value} onChange={choose} onClose={() => setOpen(false)} position={position} />, document.body)}
